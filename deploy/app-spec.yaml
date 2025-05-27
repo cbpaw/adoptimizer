@@ -1,0 +1,61 @@
+databases:
+- engine: PG
+  name: adoptimizer-db
+  num_nodes: 1
+  size: db-s-dev-database
+  version: "14"
+- cluster_name: adoptimizer-redis
+  engine: REDIS
+  name: adoptimizer-redis
+  production: true
+  version: "7"
+name: adoptimizer
+region: nyc
+services:
+- dockerfile_path: Dockerfile.web
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${adoptimizer-db.DATABASE_URL}
+  - key: DJANGO_SETTINGS_MODULE
+    scope: RUN_AND_BUILD_TIME
+    value: adoptimizer.settings_production
+  - key: SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: "django-insecure-E76rsELtoA1DxANWnwKcma9qVljHeb0m7WMN09rgdv8jEXIfq9ea9RdyhESA"
+  - key: REDIS_URL
+    scope: RUN_TIME
+    value: ${adoptimizer-redis.DATABASE_URL}
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: cbpaw/adoptimizer
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  name: adoptimizer-web
+  routes:
+  - path: /
+workers:
+- dockerfile_path: Dockerfile.web
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${adoptimizer-db.DATABASE_URL}
+  - key: DJANGO_SETTINGS_MODULE
+    scope: RUN_AND_BUILD_TIME
+    value: adoptimizer.settings_production
+  - key: SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: "django-insecure-E76rsELtoA1DxANWnwKcma9qVljHeb0m7WMN09rgdv8jEXIfq9ea9RdyhESA"
+  - key: REDIS_URL
+    scope: RUN_TIME
+    value: ${adoptimizer-redis.DATABASE_URL}
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: cbpaw/adoptimizer
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: adoptimizer-celery
+  run_command: celery -A adoptimizer worker -l INFO --pool=gevent --concurrency 2

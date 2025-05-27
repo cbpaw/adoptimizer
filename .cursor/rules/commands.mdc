@@ -1,0 +1,24 @@
+---
+description: Running commands to build, run, test and lint the project.
+globs: 
+alwaysApply: false
+---
+## Commands you can run
+
+The following commands can be used for various tools and workflows:
+- Build front-end: `make npm-build` (production) or `make npm-dev` (development)
+- Type checking: `make npm-type-check`
+- Run server: `make start` or `make start-bg` (background)
+- Run all tests: `make test`
+- Run specific test: `make test ARGS='apps.module.tests.test_file'`
+- Lint Python: `make ruff-lint`
+- Format Python: `make ruff-format`
+- Update translations: `make translations`
+
+Additional useful commands:
+- Start all services: `make start`
+- Stop all services: `make stop`
+- SSH into web container: `make ssh`
+- Django shell: `make shell`
+- Database shell: `make dbshell`
+- Run Django management commands: `make manage ARGS='command'`

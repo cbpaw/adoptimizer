@@ -1,27 +1,406 @@
 {% extends "web/app/app_base.html" %}
 {% load i18n %}
 {% load static %}
+{% load django_vite %}
+
 {% block app %}
-<section class="app-card">
-    <div class="pg-columns pg-columns-reversed pg-align-items-center">
-        <div class="pg-column-one-third">
-            <img class="img-fluid" src="{% static 'images/web/rocket-laptop.svg' %}" alt="{% translate "Fly Away!" %}">
+<div class="space-y-6">
+    <!-- Welcome Section using ShadCN Card classes -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="leading-none font-semibold text-2xl" data-slot="card-title">{% translate "Welcome to AdOptimizer!" %}</div>
+            <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Your Facebook Ads Management Dashboard" %}</div>
         </div>
-        <div class="pg-column">
-            <h1 class="pg-title">{% translate "You're Signed In!" %}</h1>
-            <h2 class="pg-subtitle">
-                {% translate "This is your application's logged in home page." %}
-            </h2>
-            <p>
-                Now go make something great!
+        <div class="px-6" data-slot="card-content">
+            <p class="text-sm text-muted-foreground mb-4">
+                {% translate "Manage and optimize your Facebook advertising campaigns from here." %}
             </p>
+            <div class="flex items-center gap-3">
+                <img class="h-24 w-auto" src="{% static 'images/web/rocket-laptop.svg' %}" alt="{% translate "Fly Away!" %}">
+            </div>
         </div>
     </div>
-</section>
-<section class="app-card">
-    <div class="pg-content">
-        <p>To add more to this page you can make new sections like this one.</p>
-        <p>Tip: the source of this page can be found at <code>templates/web/app_home.html</code></p>
+
+    <!-- Facebook Ads Section using ShadCN Card classes -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="flex justify-between items-center">
+                <div class="leading-none font-semibold text-xl" data-slot="card-title">{% translate "Facebook Ads" %}</div>
+                <div class="flex items-center gap-2">
+                    {% if not facebook_accounts %}
+                        <button onclick="showFacebookSetup()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2" data-slot="button">
+                            {% translate "Connect Facebook Account" %}
+                        </button>
+                    {% else %}
+                        <button onclick="syncFacebookAds()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button" id="sync-ads-btn">
+                            {% translate "Sync Ads" %}
+                        </button>
+                        <a href="{% url 'facebook_ads:manage_accounts' %}" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button">
+                            {% translate "Manage Accounts" %}
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="px-6" data-slot="card-content">
+            {% if facebook_accounts %}
+                <!-- Campaign Selection Info using ShadCN Alert classes -->
+                <div class="border-l-4 border-yellow-400 bg-yellow-50 p-4 mb-6 rounded-md" data-slot="alert">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="text-sm font-medium text-blue-900">Campagne Monitoring</h4>
+                            <p class="text-sm text-blue-700" data-slot="alert-description">
+                                {% if selected_campaigns_count > 0 %}
+                                    {{ selected_campaigns_count }} campagne{{ selected_campaigns_count|pluralize }} geselecteerd voor monitoring
+                                {% else %}
+                                    Geen campagnes geselecteerd voor monitoring
+                                {% endif %}
+                            </p>
+                        </div>
+                        <a href="{% url 'facebook_ads:campaign_selection' %}" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 px-3" data-slot="button">
+                            <i class="fa fa-bullhorn mr-2"></i>
+                            Selecteer Campagnes
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Stats Cards using ShadCN Card classes -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                        <div class="px-6" data-slot="card-content">
+                            <div class="text-2xl font-bold text-blue-600" id="total-ads">{{ facebook_ads|length }}</div>
+                            <div class="text-sm text-muted-foreground">{% translate "Total Ads" %}</div>
+                        </div>
+                    </div>
+                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                        <div class="px-6" data-slot="card-content">
+                            <div class="text-2xl font-bold text-green-600" id="active-ads">
+                                {% with active_count=0 %}
+                                    {% for ad in facebook_ads %}
+                                        {% if ad.status == 'ACTIVE' %}
+                                            {% with active_count=active_count|add:1 %}{% endwith %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {{ active_count }}
+                                {% endwith %}
+                            </div>
+                            <div class="text-sm text-muted-foreground">{% translate "Active Ads" %}</div>
+                        </div>
+                    </div>
+                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                        <div class="px-6" data-slot="card-content">
+                            <div class="text-2xl font-bold text-purple-600" id="total-spend">$0.00</div>
+                            <div class="text-sm text-muted-foreground">{% translate "Total Spend" %}</div>
+                        </div>
+                    </div>
+                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                        <div class="px-6" data-slot="card-content">
+                            <div class="text-2xl font-bold text-orange-600" id="total-impressions">0</div>
+                            <div class="text-sm text-muted-foreground">{% translate "Impressions" %}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ads Table using ShadCN Table classes -->
+                <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                    <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                        <div class="leading-none font-semibold" data-slot="card-title">
+                            {% translate "Recent Ads" %}
+                            {% if selected_campaigns_count > 0 %}
+                                <span class="text-sm font-normal text-muted-foreground">(van geselecteerde campagnes)</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="px-6" data-slot="card-content">
+                        <div class="overflow-x-auto">
+                            <table class="w-full caption-bottom text-sm" data-slot="table">
+                                <thead class="[&_tr]:border-b" data-slot="table-header">
+                                    <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Ad Name" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Status" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Campaign" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Spend" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Impressions" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "Clicks" %}
+                                        </th>
+                                        <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
+                                            {% translate "CTR" %}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="[&_tr:last-child]:border-0" data-slot="table-body" id="ads-tbody">
+                                    {% for ad in facebook_ads %}
+                                    <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            <div class="font-medium">{{ ad.ad_name|truncatechars:30 }}</div>
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
+                                                {% if ad.status == 'ACTIVE' %}bg-green-100 text-green-800
+                                                {% elif ad.status == 'PAUSED' %}bg-yellow-100 text-yellow-800
+                                                {% else %}bg-red-100 text-red-800{% endif %}" data-slot="badge">
+                                                {{ ad.status }}
+                                            </span>
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0 text-muted-foreground" data-slot="table-cell">
+                                            {{ ad.campaign_name|truncatechars:25 }}
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            ${{ ad.spend }}
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            {{ ad.impressions|floatformat:0 }}
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            {{ ad.clicks }}
+                                        </td>
+                                        <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
+                                            {{ ad.ctr|floatformat:2 }}%
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
+                                        <td colspan="7" class="p-8 text-center text-muted-foreground" data-slot="table-cell">
+                                            {% if selected_campaigns_count == 0 %}
+                                                {% translate "No campaigns selected for monitoring." %} 
+                                                <a href="{% url 'facebook_ads:campaign_selection' %}" class="text-primary hover:underline">{% translate "Select campaigns" %}</a>
+                                            {% else %}
+                                                {% translate "No ads found for selected campaigns." %}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <div class="text-muted-foreground mb-4">
+                        <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium mb-2">{% translate "No Facebook Ad Accounts Connected" %}</h3>
+                    <p class="text-muted-foreground mb-4">{% translate "Connect your Facebook ad account to view and manage your ads from this dashboard." %}</p>
+                    <button onclick="showFacebookSetup()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2" data-slot="button">
+                        {% translate "Connect Facebook Account" %}
+                    </button>
+                </div>
+            {% endif %}
+        </div>
     </div>
-</section>
+</div>
+
+<!-- Include ShadCN styles and JavaScript functionality -->
+{{ facebook_accounts|json_script:'facebook-accounts' }}
+{{ show_facebook_setup_modal|json_script:'show-facebook-setup-modal' }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load Facebook ads summary
+    loadFacebookAdsSummary();
+    
+    // Auto-show Facebook setup modal if no accounts are connected
+    const showSetupModal = JSON.parse(document.getElementById('show-facebook-setup-modal').textContent);
+    if (showSetupModal) {
+        setTimeout(() => {
+            showFacebookSetup();
+        }, 1000);
+    }
+});
+
+function showFacebookSetup() {
+    resetModal();
+    document.getElementById('facebook-setup-modal').showModal();
+}
+
+function syncFacebookAds() {
+    const btn = document.getElementById('sync-ads-btn');
+    if (!btn) return;
+    
+    const originalText = btn.textContent;
+    btn.textContent = 'Syncing...';
+    btn.disabled = true;
+
+    const facebookAccounts = JSON.parse(document.getElementById('facebook-accounts').textContent);
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    
+    if (facebookAccounts && facebookAccounts.length > 0) {
+        const accountId = facebookAccounts[0].id;
+        
+        fetch(`/facebook-ads/accounts/${accountId}/sync/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Successfully synced ${data.synced_count} ads!`);
+                location.reload();
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while syncing ads.');
+        })
+        .finally(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        });
+    } else {
+        alert('No Facebook accounts found.');
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function loadFacebookAdsSummary() {
+    const totalAdsElement = document.getElementById('total-ads');
+    if (!totalAdsElement) {
+        return;
+    }
+
+    fetch('/facebook-ads/api/summary/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const summary = data.summary;
+                const totalAds = document.getElementById('total-ads');
+                const activeAds = document.getElementById('active-ads');
+                const totalSpend = document.getElementById('total-spend');
+                const totalImpressions = document.getElementById('total-impressions');
+                
+                if (totalAds) totalAds.textContent = summary.total_ads;
+                if (activeAds) activeAds.textContent = summary.active_ads;
+                if (totalSpend) totalSpend.textContent = `$${summary.total_spend.toFixed(2)}`;
+                if (totalImpressions) totalImpressions.textContent = summary.total_impressions.toLocaleString();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading Facebook ads summary:', error);
+        });
+}
+</script>
+
+<!-- Facebook Setup Modal -->
+<dialog id="facebook-setup-modal" class="modal">
+  <div class="modal-box w-11/12 max-w-2xl">
+    <!-- Hidden form for CSRF token -->
+    <form style="display: none;">
+      {% csrf_token %}
+    </form>
+    
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+    </form>
+    
+    <h3 class="font-bold text-lg mb-4">Facebook Ad Account Toevoegen</h3>
+    
+    <!-- Step 1: App ID Input -->
+    <div id="step-app-id" class="step-content">
+      <div class="mb-4">
+        <label class="label">
+          <span class="label-text">Facebook App ID</span>
+        </label>
+        <input type="text" id="facebook-app-id" class="input input-bordered w-full" placeholder="Voer uw Facebook App ID in">
+        <div class="label">
+          <span class="label-text-alt">U vindt dit in uw Facebook Developer Console</span>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="proceedToTokenStep()" class="btn btn-primary">Volgende</button>
+        <button onclick="closeModal()" class="btn">Annuleren</button>
+      </div>
+    </div>
+    
+    <!-- Step 2: Token Generation -->
+    <div id="step-token" class="step-content hidden">
+      <div class="mb-4">
+        <p class="mb-3">Volg deze stappen om uw access token te genereren:</p>
+        <ol class="list-decimal list-inside space-y-2 mb-4">
+          <li>Klik op onderstaande link om Facebook Graph API Explorer te openen</li>
+          <li>Selecteer uw app en genereer een access token</li>
+          <li>Kopieer de token en plak deze in het veld hieronder</li>
+        </ol>
+        <a id="graph-explorer-link" href="#" target="_blank" class="btn btn-outline mb-4">
+          <i class="fa fa-external-link"></i>
+          Open Graph API Explorer
+        </a>
+        
+        <label class="label">
+          <span class="label-text">Access Token</span>
+        </label>
+        <textarea id="facebook-token" class="textarea textarea-bordered w-full h-20" placeholder="Plak uw access token hier"></textarea>
+      </div>
+      <div class="modal-action">
+        <button onclick="fetchAdAccounts()" class="btn btn-primary" id="fetch-accounts-btn">Haal Ad Accounts Op</button>
+        <button onclick="backToAppIdStep()" class="btn btn-ghost">Terug</button>
+      </div>
+    </div>
+    
+    <!-- Step 3: Account Selection -->
+    <div id="step-accounts" class="step-content hidden">
+      <div class="mb-4">
+        <h4 class="font-semibold mb-3">Selecteer Ad Account</h4>
+        <div id="ad-accounts-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <!-- Ad accounts will be populated here -->
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="connectSelectedAccount()" class="btn btn-primary" id="connect-account-btn" disabled>Account Koppelen</button>
+        <button onclick="backToTokenStep()" class="btn btn-ghost">Terug</button>
+      </div>
+    </div>
+    
+    <!-- Loading state -->
+    <div id="loading-state" class="step-content hidden text-center py-8">
+      <span class="loading loading-spinner loading-lg"></span>
+      <p class="mt-4">Bezig met laden...</p>
+    </div>
+    
+    <!-- Success state -->
+    <div id="success-state" class="step-content hidden text-center py-8">
+      <div class="text-green-500 text-4xl mb-4">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h4 class="font-semibold text-lg mb-2">Account Succesvol Gekoppeld!</h4>
+      <p class="text-gray-600 mb-4">Uw Facebook Ad Account is succesvol gekoppeld.</p>
+      <button onclick="location.reload()" class="btn btn-primary">Dashboard Herladen</button>
+    </div>
+    
+    <!-- Error state -->
+    <div id="error-state" class="step-content hidden text-center py-8">
+      <div class="text-red-500 text-4xl mb-4">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <h4 class="font-semibold text-lg mb-2">Er is een fout opgetreden</h4>
+      <p class="text-gray-600 mb-4" id="error-message">Er is een probleem opgetreden bij het koppelen van uw account.</p>
+      <div class="space-x-2">
+        <button onclick="resetModal()" class="btn btn-ghost">Opnieuw Proberen</button>
+        <button onclick="closeModal()" class="btn">Sluiten</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script src="{% static 'facebook_ads/js/facebook_setup.js' %}"></script>
 {% endblock %}

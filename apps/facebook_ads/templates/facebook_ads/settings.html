@@ -1,0 +1,477 @@
+{% extends "web/app/app_base.html" %}
+{% load static %}
+
+{% block title %}Facebook Ads Instellingen{% endblock %}
+
+{% block app %}
+<div class="space-y-6">
+    <!-- Header Card using ShadCN -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="leading-none font-semibold text-2xl" data-slot="card-title">Facebook Ads Instellingen</div>
+            <div class="text-muted-foreground text-sm" data-slot="card-description">Beheer uw Facebook token en ad accounts</div>
+        </div>
+    </div>
+
+    <!-- Tabs Section using ShadCN Tabs -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="px-6">
+            <!-- Tabs Navigation using ShadCN classes -->
+            <div class="flex flex-col gap-2" data-slot="tabs">
+                <div class="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-1" data-slot="tabs-list">
+                    <button 
+                        class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm"
+                        data-tab="token"
+                        data-slot="tabs-trigger"
+                        onclick="switchTab('token')"
+                    >
+                        <i class="fas fa-key mr-2"></i>
+                        Token Beheer
+                    </button>
+                    <button 
+                        class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm"
+                        data-tab="accounts"
+                        data-slot="tabs-trigger"
+                        onclick="switchTab('accounts')"
+                    >
+                        <i class="fas fa-link mr-2"></i>
+                        Ad Accounts
+                    </button>
+                </div>
+
+                <!-- Token Management Tab -->
+                <div id="token-tab" class="tab-content flex-1 outline-none" data-slot="tabs-content">
+                    <div class="mt-6 max-w-2xl">
+                        <h3 class="text-lg font-semibold mb-4">Facebook Token Configuratie</h3>
+                        
+                        <!-- Alert using ShadCN styles -->
+                        <div class="border-l-4 border-blue-400 bg-blue-50 p-4 mb-6 rounded-md" data-slot="alert">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                                </div>
+                                <div class="ml-3" data-slot="alert-description">
+                                    <h4 class="text-sm font-medium text-blue-900">Nieuwe Facebook Account Toevoegen</h4>
+                                    <p class="text-sm text-blue-700 mt-1">
+                                        Voeg een nieuw Facebook Ad Account toe met uw App ID en access token.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button 
+                            onclick="showFacebookSetup()" 
+                            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                            data-slot="button"
+                        >
+                            <i class="fas fa-plus mr-2"></i>
+                            Nieuw Account Toevoegen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ad Accounts Management Tab -->
+                <div id="accounts-tab" class="tab-content hidden flex-1 outline-none" data-slot="tabs-content">
+                    <div class="mt-6">
+                        <h3 class="text-lg font-semibold mb-4">Gekoppelde Ad Accounts</h3>
+                        
+                        {% if user_accounts %}
+                            <div class="space-y-4">
+                                {% for account in user_accounts %}
+                                    <!-- Account Card using ShadCN Card styles -->
+                                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                                        <div class="px-6" data-slot="card-content">
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1">
+                                                    <h4 class="text-lg font-medium">{{ account.ad_account_name }}</h4>
+                                                    <div class="mt-2 space-y-1">
+                                                        <p class="text-sm text-muted-foreground">
+                                                            <span class="font-medium">Account ID:</span> {{ account.ad_account_id }}
+                                                        </p>
+                                                        <p class="text-sm text-muted-foreground">
+                                                            <span class="font-medium">App ID:</span> {{ account.app_id }}
+                                                        </p>
+                                                        <p class="text-sm text-muted-foreground">
+                                                            <span class="font-medium">Toegevoegd:</span> {{ account.created_at|date:"d-m-Y H:i" }}
+                                                        </p>
+                                                    </div>
+                                                    <div class="mt-3">
+                                                        <!-- Badge using ShadCN styles -->
+                                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
+                                                            <i class="fas fa-check-circle mr-1"></i>
+                                                            Actief
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div class="ml-4 flex-shrink-0">
+                                                    <!-- Disconnect Button using ShadCN styles -->
+                                                    <button 
+                                                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 h-9 px-4 py-2 disconnect-account-btn"
+                                                        data-slot="button"
+                                                        data-account-id="{{ account.id }}"
+                                                        data-account-name="{{ account.ad_account_name }}"
+                                                    >
+                                                        <i class="fas fa-unlink mr-1"></i>
+                                                        Ontkoppelen
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <!-- Empty State -->
+                            <div class="text-center py-12">
+                                <i class="fas fa-link text-muted-foreground text-4xl mb-4"></i>
+                                <h3 class="text-lg font-medium mb-2">Geen Ad Accounts Gekoppeld</h3>
+                                <p class="text-muted-foreground mb-4">U heeft nog geen Facebook Ad Accounts gekoppeld.</p>
+                                <button 
+                                    onclick="switchTab('token')" 
+                                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                                    data-slot="button"
+                                >
+                                    <i class="fas fa-plus mr-2"></i>
+                                    Eerste Account Toevoegen
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Facebook Setup Modal (reuse existing modal) -->
+<dialog id="facebook-setup-modal" class="modal">
+  <div class="modal-box w-11/12 max-w-2xl">
+    <!-- Hidden form for CSRF token -->
+    <form style="display: none;">
+      {% csrf_token %}
+    </form>
+    
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+    </form>
+    
+    <h3 class="font-bold text-lg mb-4">Facebook Ad Account Toevoegen</h3>
+    
+    <!-- Step 1: App ID Input -->
+    <div id="step-app-id" class="step-content">
+      <div class="mb-4">
+        <label class="label">
+          <span class="label-text">Facebook App ID</span>
+        </label>
+        <input type="text" id="facebook-app-id" class="input input-bordered w-full" placeholder="Voer uw Facebook App ID in">
+        <div class="label">
+          <span class="label-text-alt">U vindt dit in uw Facebook Developer Console</span>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="proceedToTokenStep()" class="btn btn-primary">Volgende</button>
+        <button onclick="closeModal()" class="btn">Annuleren</button>
+      </div>
+    </div>
+    
+    <!-- Step 2: Token Generation -->
+    <div id="step-token" class="step-content hidden">
+      <div class="mb-4">
+        <p class="mb-3">Volg deze stappen om uw access token te genereren:</p>
+        <ol class="list-decimal list-inside space-y-2 mb-4">
+          <li>Klik op onderstaande link om Facebook Graph API Explorer te openen</li>
+          <li>Selecteer uw app en genereer een access token</li>
+          <li>Kopieer de token en plak deze in het veld hieronder</li>
+        </ol>
+        <a id="graph-explorer-link" href="#" target="_blank" class="btn btn-outline mb-4">
+          <i class="fa fa-external-link"></i>
+          Open Graph API Explorer
+        </a>
+        
+        <label class="label">
+          <span class="label-text">Access Token</span>
+        </label>
+        <textarea id="facebook-token" class="textarea textarea-bordered w-full h-20" placeholder="Plak uw access token hier"></textarea>
+      </div>
+      <div class="modal-action">
+        <button onclick="fetchAdAccounts()" class="btn btn-primary" id="fetch-accounts-btn">Haal Ad Accounts Op</button>
+        <button onclick="backToAppIdStep()" class="btn btn-ghost">Terug</button>
+      </div>
+    </div>
+    
+    <!-- Step 3: Account Selection -->
+    <div id="step-accounts" class="step-content hidden">
+      <div class="mb-4">
+        <h4 class="font-semibold mb-3">Selecteer Ad Account</h4>
+        <div id="ad-accounts-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <!-- Ad accounts will be populated here -->
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="connectSelectedAccount()" class="btn btn-primary" id="connect-account-btn" disabled>Account Koppelen</button>
+        <button onclick="backToTokenStep()" class="btn btn-ghost">Terug</button>
+      </div>
+    </div>
+    
+    <!-- Loading state -->
+    <div id="loading-state" class="step-content hidden text-center py-8">
+      <span class="loading loading-spinner loading-lg"></span>
+      <p class="mt-4">Bezig met laden...</p>
+    </div>
+    
+    <!-- Success state -->
+    <div id="success-state" class="step-content hidden text-center py-8">
+      <div class="text-green-500 text-4xl mb-4">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <h4 class="font-semibold text-lg mb-2">Account Succesvol Gekoppeld!</h4>
+      <p class="text-gray-600 mb-4">Uw Facebook Ad Account is succesvol gekoppeld.</p>
+      <button onclick="location.reload()" class="btn btn-primary">Dashboard Herladen</button>
+    </div>
+    
+    <!-- Error state -->
+    <div id="error-state" class="step-content hidden text-center py-8">
+      <div class="text-red-500 text-4xl mb-4">
+        <i class="fas fa-exclamation-triangle"></i>
+      </div>
+      <h4 class="font-semibold text-lg mb-2">Er is een fout opgetreden</h4>
+      <p class="text-gray-600 mb-4" id="error-message">Er is een probleem opgetreden bij het koppelen van uw account.</p>
+      <div class="space-x-2">
+        <button onclick="resetModal()" class="btn btn-ghost">Opnieuw Proberen</button>
+        <button onclick="closeModal()" class="btn">Sluiten</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize with token tab active
+    switchTab('token');
+    
+    // Add event listeners for disconnect buttons
+    document.querySelectorAll('.disconnect-account-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const accountId = this.getAttribute('data-account-id');
+            const accountName = this.getAttribute('data-account-name');
+            disconnectAccount(accountId, accountName);
+        });
+    });
+});
+
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.add('hidden');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.remove('hidden');
+    
+    // Update tab button states
+    document.querySelectorAll('[data-slot="tabs-trigger"]').forEach(button => {
+        if (button.getAttribute('data-tab') === tabName) {
+            button.setAttribute('data-state', 'active');
+            button.classList.add('bg-background', 'text-foreground', 'shadow-sm');
+            button.classList.remove('text-muted-foreground');
+        } else {
+            button.setAttribute('data-state', 'inactive');
+            button.classList.remove('bg-background', 'text-foreground', 'shadow-sm');
+            button.classList.add('text-muted-foreground');
+        }
+    });
+}
+
+function disconnectAccount(accountId, accountName) {
+    if (!confirm(`Weet u zeker dat u het account "${accountName}" wilt ontkoppelen?`)) {
+        return;
+    }
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    
+    fetch(`/facebook-ads/api/disconnect-account/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            account_id: accountId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Account succesvol ontkoppeld!');
+            location.reload();
+        } else {
+            alert(`Error: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Er is een fout opgetreden bij het ontkoppelen van het account.');
+    });
+}
+
+function showFacebookSetup() {
+    resetModal();
+    document.getElementById('facebook-setup-modal').showModal();
+}
+
+function closeModal() {
+    document.getElementById('facebook-setup-modal').close();
+}
+
+function resetModal() {
+    document.getElementById('step-app-id').classList.remove('hidden');
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('loading-state').classList.add('hidden');
+    
+    document.getElementById('facebook-app-id').value = '';
+    document.getElementById('facebook-token').value = '';
+    document.getElementById('ad-accounts-list').innerHTML = '';
+}
+
+function proceedToTokenStep() {
+    const appId = document.getElementById('facebook-app-id').value.trim();
+    if (!appId) {
+        alert('Voer uw Facebook App ID in');
+        return;
+    }
+
+    const graphLink = `https://developers.facebook.com/tools/explorer/${appId}/`;
+    document.getElementById('graph-explorer-link').href = graphLink;
+
+    document.getElementById('step-app-id').classList.add('hidden');
+    document.getElementById('step-token').classList.remove('hidden');
+}
+
+function backToAppIdStep() {
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('step-app-id').classList.remove('hidden');
+}
+
+function backToTokenStep() {
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-token').classList.remove('hidden');
+}
+
+function fetchAdAccounts() {
+    const token = document.getElementById('facebook-token').value.trim();
+    if (!token) {
+        alert('Voer uw access token in');
+        return;
+    }
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+
+    fetch('/facebook-ads/api/fetch-accounts/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            access_token: token
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loading-state').classList.add('hidden');
+        
+        if (data.success) {
+            displayAdAccounts(data.accounts);
+            document.getElementById('step-accounts').classList.remove('hidden');
+        } else {
+            alert(`Error: ${data.message}`);
+            document.getElementById('step-token').classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('step-token').classList.remove('hidden');
+        console.error('Error:', error);
+        alert('Er is een fout opgetreden bij het ophalen van ad accounts');
+    });
+}
+
+function displayAdAccounts(accounts) {
+    const container = document.getElementById('ad-accounts-list');
+    container.innerHTML = '';
+
+    accounts.forEach(account => {
+        const accountDiv = document.createElement('div');
+        accountDiv.className = 'form-control';
+        accountDiv.innerHTML = `
+            <label class="label cursor-pointer justify-start space-x-3">
+                <input type="radio" name="selected-account" value="${account.id}" class="radio radio-primary" onchange="enableConnectButton()">
+                <div class="flex-1">
+                    <div class="font-medium">${account.name}</div>
+                    <div class="text-sm text-gray-500">ID: ${account.id}</div>
+                    ${account.account_status ? `<div class="text-xs text-green-600">Status: ${account.account_status}</div>` : ''}
+                </div>
+            </label>
+        `;
+        container.appendChild(accountDiv);
+    });
+}
+
+function enableConnectButton() {
+    const selectedAccount = document.querySelector('input[name="selected-account"]:checked');
+    document.getElementById('connect-account-btn').disabled = !selectedAccount;
+}
+
+function connectSelectedAccount() {
+    const selectedAccount = document.querySelector('input[name="selected-account"]:checked');
+    if (!selectedAccount) {
+        alert('Selecteer een ad account');
+        return;
+    }
+
+    const appId = document.getElementById('facebook-app-id').value.trim();
+    const token = document.getElementById('facebook-token').value.trim();
+    const accountId = selectedAccount.value;
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+
+    fetch('/facebook-ads/api/connect-account/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            app_id: appId,
+            access_token: token,
+            account_id: accountId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Facebook ad account succesvol gekoppeld!');
+            closeModal();
+            location.reload();
+        } else {
+            alert(`Error bij het koppelen van account: ${data.message}`);
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('step-accounts').classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Er is een fout opgetreden bij het koppelen van het account');
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('step-accounts').classList.remove('hidden');
+    });
+}
+</script>
+{% endblock %} 

@@ -8,6 +8,7 @@
 
     <h1 class="pg-title">{% translate "Project Dashboard" %}</h1>
     <form>
+      {% csrf_token %}
       <div class="pg-columns">
         <div class="pg-column">
           {% render_field form.start %}
@@ -30,22 +31,671 @@
         </div>
       </div>
     </div>
+    
+    <!-- Facebook Ads Section -->
+    <div class="mt-6">
+      <div class="pg-subtitle flex justify-between items-center">
+        {% translate "Facebook Ads" %}
+        <div class="space-x-2">
+          {% if not facebook_accounts %}
+            <button onclick="showFacebookSetup()" class="pg-button-primary text-sm">
+              {% translate "Connect Facebook Account" %}
+            </button>
+          {% else %}
+            <button onclick="syncFacebookAds()" class="pg-button-secondary text-sm" id="sync-ads-btn">
+              {% translate "Sync Ads" %}
+            </button>
+            <a href="{% url 'facebook_ads:manage_accounts' %}" class="pg-button-secondary text-sm">
+              {% translate "Manage Accounts" %}
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      
+      {% if facebook_accounts %}
+        <!-- Campaign Selection Info -->
+        <div class="mt-4 mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div class="flex justify-between items-center">
+            <div>
+              <h4 class="text-sm font-medium text-blue-900">Campagne Monitoring</h4>
+              <p class="text-sm text-blue-700">
+                {% if selected_campaigns_count > 0 %}
+                  {{ selected_campaigns_count }} campagne{{ selected_campaigns_count|pluralize }} geselecteerd voor monitoring
+                {% else %}
+                  Geen campagnes geselecteerd - alle ads worden getoond
+                {% endif %}
+              </p>
+            </div>
+            <a href="{% url 'facebook_ads:campaign_selection' %}" class="btn btn-sm btn-outline btn-primary">
+              <i class="fa fa-bullhorn mr-2"></i>
+              Selecteer Campagnes
+            </a>
+          </div>
+        </div>
+        
+        <div class="mt-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <div class="text-2xl font-bold text-blue-600" id="total-ads">{{ facebook_ads|length }}</div>
+              <div class="text-sm text-blue-800">{% translate "Total Ads" %}</div>
+            </div>
+                         <div class="bg-green-50 p-4 rounded-lg">
+               <div class="text-2xl font-bold text-green-600" id="active-ads">
+                 {% with active_count=0 %}
+                   {% for ad in facebook_ads %}
+                     {% if ad.status == 'ACTIVE' %}
+                       {% with active_count=active_count|add:1 %}{% endwith %}
+                     {% endif %}
+                   {% endfor %}
+                   {{ active_count }}
+                 {% endwith %}
+               </div>
+               <div class="text-sm text-green-800">{% translate "Active Ads" %}</div>
+             </div>
+             <div class="bg-purple-50 p-4 rounded-lg">
+               <div class="text-2xl font-bold text-purple-600" id="total-spend">
+                 $0.00
+               </div>
+               <div class="text-sm text-purple-800">{% translate "Total Spend" %}</div>
+             </div>
+             <div class="bg-orange-50 p-4 rounded-lg">
+               <div class="text-2xl font-bold text-orange-600" id="total-impressions">
+                 0
+               </div>
+               <div class="text-sm text-orange-800">{% translate "Impressions" %}</div>
+             </div>
+          </div>
+          
+          <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <h3 class="text-lg font-medium text-gray-900">
+                {% translate "Recent Ads" %}
+                {% if selected_campaigns_count > 0 %}
+                  <span class="text-sm font-normal text-gray-600">(van geselecteerde campagnes)</span>
+                {% endif %}
+              </h3>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200" id="ads-table">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Ad Name" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Status" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Campaign" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Spend" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Impressions" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "Clicks" %}
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {% translate "CTR" %}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="ads-tbody">
+                  {% for ad in facebook_ads %}
+                  <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {{ ad.ad_name|truncatechars:30 }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                        {% if ad.status == 'ACTIVE' %}bg-green-100 text-green-800
+                        {% elif ad.status == 'PAUSED' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ ad.status }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {{ ad.campaign_name|truncatechars:25 }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${{ ad.spend }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {{ ad.impressions|floatformat:0 }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {{ ad.clicks }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {{ ad.ctr|floatformat:2 }}%
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="7" class="px-6 py-4 text-center text-sm text-gray-500">
+                      {% if selected_campaigns_count == 0 %}
+                        {% translate "No campaigns selected for monitoring." %} 
+                        <a href="{% url 'facebook_ads:campaign_selection' %}" class="text-blue-600 hover:text-blue-800">{% translate "Select campaigns" %}</a>
+                      {% else %}
+                        {% translate "No ads found for selected campaigns." %}
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="mt-4 text-center py-8">
+          <div class="text-gray-500 mb-4">
+            <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-2">{% translate "No Facebook Ad Accounts Connected" %}</h3>
+          <p class="text-gray-500 mb-4">{% translate "Connect your Facebook ad account to view and manage your ads from this dashboard." %}</p>
+          <button onclick="showFacebookSetup()" class="pg-button-primary">
+            {% translate "Connect Facebook Account" %}
+          </button>
+        </div>
+      {% endif %}
+    </div>
 </section>
+
+<!-- Facebook Setup Modal -->
+<dialog id="facebook-setup-modal" class="modal">
+  <div class="modal-box w-11/12 max-w-2xl">
+    <!-- Hidden form for CSRF token -->
+    <form style="display: none;">
+      {% csrf_token %}
+    </form>
+    
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+    </form>
+    
+    <h3 class="font-bold text-lg mb-4">{% translate "Connect Facebook Ad Account!!!" %}</h3>
+    
+    <!-- Step 1: App ID Input -->
+    <div id="step-app-id" class="step-content">
+      <div class="mb-4">
+        <label class="label">
+          <span class="label-text">{% translate "Facebook App ID" %}</span>
+        </label>
+        <input type="text" id="facebook-app-id" class="input input-bordered w-full" placeholder="{% translate 'Enter your Facebook App ID' %}">
+        <div class="label">
+          <span class="label-text-alt">{% translate "You can find this in your Facebook Developer Console" %}</span>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="proceedToTokenStep()" class="btn btn-primary">{% translate "Next" %}</button>
+        <button onclick="closeModal()" class="btn">{% translate "Cancel" %}</button>
+      </div>
+    </div>
+    
+    <!-- Step 2: Token Generation -->
+    <div id="step-token" class="step-content hidden">
+      <div class="mb-4">
+        <p class="mb-3">{% translate "Please follow these steps to generate your access token:" %}</p>
+        <ol class="list-decimal list-inside space-y-2 mb-4">
+          <li>{% translate "Click the link below to open Facebook Graph API Explorer" %}</li>
+          <li>{% translate "Select your app and generate an access token" %}</li>
+          <li>{% translate "Copy the token and paste it in the field below" %}</li>
+        </ol>
+        <a id="graph-explorer-link" href="#" target="_blank" class="btn btn-outline mb-4">
+          <i class="fa fa-external-link"></i>
+          {% translate "Open Graph API Explorer" %}
+        </a>
+        
+        <label class="label">
+          <span class="label-text">{% translate "Access Token" %}</span>
+        </label>
+        <textarea id="facebook-token" class="textarea textarea-bordered w-full h-20" placeholder="{% translate 'Paste your access token here' %}"></textarea>
+      </div>
+      <div class="modal-action">
+        <button onclick="fetchAdAccounts()" class="btn btn-primary" id="fetch-accounts-btn">{% translate "Fetch Ad Accounts" %}</button>
+        <button onclick="backToAppIdStep()" class="btn btn-ghost">{% translate "Back" %}</button>
+      </div>
+    </div>
+    
+    <!-- Step 3: Account Selection -->
+    <div id="step-accounts" class="step-content hidden">
+      <div class="mb-4">
+        <h4 class="font-semibold mb-3">{% translate "Select Ad Account" %}</h4>
+        <div id="ad-accounts-list" class="space-y-2 max-h-60 overflow-y-auto">
+          <!-- Ad accounts will be populated here -->
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="fetchAdsFromSelected()" class="btn btn-primary" id="fetch-ads-btn" disabled>{% translate "Fetch Ads" %}</button>
+        <button onclick="backToTokenStep()" class="btn btn-ghost">{% translate "Back" %}</button>
+      </div>
+    </div>
+    
+    <!-- Step 4: Ads Display -->
+    <div id="step-ads-display" class="step-content hidden">
+      <div class="mb-4">
+        <h4 class="font-semibold mb-3">{% translate "Facebook Ads" %}</h4>
+        <div id="ads-count" class="text-sm text-gray-600 mb-3"></div>
+        <div class="overflow-x-auto max-h-96">
+          <table class="table table-xs">
+            <thead>
+              <tr>
+                <th>{% translate "Ad Name" %}</th>
+                <th>{% translate "Status" %}</th>
+                <th>{% translate "Campaign" %}</th>
+                <th>{% translate "Spend" %}</th>
+                <th>{% translate "Impressions" %}</th>
+                <th>{% translate "Clicks" %}</th>
+                <th>{% translate "CTR" %}</th>
+              </tr>
+            </thead>
+            <tbody id="modal-ads-tbody">
+              <!-- Ads will be populated here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-action">
+        <button onclick="saveAdsAndClose()" class="btn btn-primary">{% translate "Save & Use These Ads" %}</button>
+        <button onclick="backToAccountsStep()" class="btn btn-ghost">{% translate "Back to Accounts" %}</button>
+      </div>
+    </div>
+    
+    <!-- Loading state -->
+    <div id="loading-state" class="step-content hidden text-center py-8">
+      <span class="loading loading-spinner loading-lg"></span>
+      <p class="mt-4">{% translate "Loading..." %}</p>
+    </div>
+  </div>
+</dialog>
+
 {% endblock %}
 {% block page_js %}
 {{ signup_data|json_script:'signup-data' }}
+{{ facebook_accounts|json_script:'facebook-accounts' }}
+{{ start|json_script:'start-date' }}
+{{ end|json_script:'end-date' }}
+{{ start_value|json_script:'start-value' }}
+{{ show_facebook_setup_modal|json_script:'show-facebook-setup-modal' }}
 {% vite_asset 'assets/javascript/app.js' %}
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const start = new Date("{{ start }}");
-    const end = new Date("{{ end }}");
-    const startValue = {{ start_value }};
+    const start = new Date(JSON.parse(document.getElementById('start-date').textContent));
+    const end = new Date(JSON.parse(document.getElementById('end-date').textContent));
+    const startValue = JSON.parse(document.getElementById('start-value').textContent);
 
     const signupChartCtx = document.getElementById('signup-chart').getContext('2d');
     const userChartCtx = document.getElementById('user-chart').getContext('2d');
     const signupData = JSON.parse(document.getElementById('signup-data').textContent);
     SiteJS.app.DashboardCharts.barChartWithDates(signupChartCtx, start, end, signupData, "User Signups");
     SiteJS.app.DashboardCharts.cumulativeChartWithDates(userChartCtx, start, end, signupData, "Registered Users", startValue);
+    
+    // Load Facebook ads summary
+    loadFacebookAdsSummary();
+    
+    // Auto-show Facebook setup modal if no accounts are connected
+    const showSetupModal = JSON.parse(document.getElementById('show-facebook-setup-modal').textContent);
+    console.log('Show setup modal:', showSetupModal);
+    if (showSetupModal) {
+      // Small delay to ensure page is fully loaded
+      console.log('Setting timeout to show Facebook setup modal');
+      setTimeout(() => {
+        console.log('Showing Facebook setup modal');
+        showFacebookSetup();
+      }, 1000);
+    }
   });
+
+  function showFacebookSetup() {
+    // Reset modal to first step
+    resetModal();
+    document.getElementById('facebook-setup-modal').showModal();
+  }
+
+  function closeModal() {
+    document.getElementById('facebook-setup-modal').close();
+  }
+
+  function resetModal() {
+    // Show first step, hide others
+    document.getElementById('step-app-id').classList.remove('hidden');
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-ads-display').classList.add('hidden');
+    document.getElementById('loading-state').classList.add('hidden');
+    
+    // Clear inputs
+    document.getElementById('facebook-app-id').value = '';
+    document.getElementById('facebook-token').value = '';
+    document.getElementById('ad-accounts-list').innerHTML = '';
+    document.getElementById('modal-ads-tbody').innerHTML = '';
+  }
+
+  function proceedToTokenStep() {
+    const appId = document.getElementById('facebook-app-id').value.trim();
+    if (!appId) {
+      alert('{% translate "Please enter your Facebook App ID" %}');
+      return;
+    }
+
+    // Update the Graph Explorer link
+    const graphLink = `https://developers.facebook.com/tools/explorer/${appId}/`;
+    document.getElementById('graph-explorer-link').href = graphLink;
+
+    // Show token step
+    document.getElementById('step-app-id').classList.add('hidden');
+    document.getElementById('step-token').classList.remove('hidden');
+  }
+
+  function backToAppIdStep() {
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('step-app-id').classList.remove('hidden');
+  }
+
+  function backToTokenStep() {
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('step-token').classList.remove('hidden');
+  }
+
+  function fetchAdAccounts() {
+    const token = document.getElementById('facebook-token').value.trim();
+    if (!token) {
+      alert('{% translate "Please enter your access token" %}');
+      return;
+    }
+
+    // Get CSRF token safely
+    const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenElement ? csrfTokenElement.value : '';
+
+    // Show loading state
+    document.getElementById('step-token').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+
+    // Make API call to fetch ad accounts
+    fetch('/facebook-ads/api/fetch-accounts/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        access_token: token
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('loading-state').classList.add('hidden');
+      
+      if (data.success) {
+        displayAdAccounts(data.accounts);
+        document.getElementById('step-accounts').classList.remove('hidden');
+      } else {
+        alert(`{% translate "Error" %}: ${data.message}`);
+        document.getElementById('step-token').classList.remove('hidden');
+      }
+    })
+    .catch(error => {
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('step-token').classList.remove('hidden');
+      console.error('Error:', error);
+      alert('{% translate "An error occurred while fetching ad accounts" %}');
+    });
+  }
+
+  function displayAdAccounts(accounts) {
+    const container = document.getElementById('ad-accounts-list');
+    container.innerHTML = '';
+
+    accounts.forEach(account => {
+      const accountDiv = document.createElement('div');
+      accountDiv.className = 'form-control';
+      accountDiv.innerHTML = `
+        <label class="label cursor-pointer justify-start space-x-3">
+          <input type="radio" name="selected-account" value="${account.id}" class="radio radio-primary" onchange="enableFetchButton()">
+          <div class="flex-1">
+            <div class="font-medium">${account.name}</div>
+            <div class="text-sm text-gray-500">ID: ${account.id}</div>
+            ${account.account_status ? `<div class="text-xs text-green-600">Status: ${account.account_status}</div>` : ''}
+          </div>
+        </label>
+      `;
+      container.appendChild(accountDiv);
+    });
+  }
+
+  function enableFetchButton() {
+    const selectedAccount = document.querySelector('input[name="selected-account"]:checked');
+    document.getElementById('fetch-ads-btn').disabled = !selectedAccount;
+  }
+
+  function fetchAdsFromSelected() {
+    const selectedAccount = document.querySelector('input[name="selected-account"]:checked');
+    if (!selectedAccount) {
+      alert('{% translate "Please select an ad account" %}');
+      return;
+    }
+
+    const appId = document.getElementById('facebook-app-id').value.trim();
+    const token = document.getElementById('facebook-token').value.trim();
+    const accountId = selectedAccount.value;
+
+    // Get CSRF token safely
+    const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenElement ? csrfTokenElement.value : '';
+
+    // Show loading state
+    document.getElementById('step-accounts').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+
+    // Fetch ads from selected account
+    fetch('/facebook-ads/api/fetch-ads/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        access_token: token,
+        account_id: accountId
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('loading-state').classList.add('hidden');
+      
+      if (data.success) {
+        displayAds(data.ads);
+        document.getElementById('step-ads-display').classList.remove('hidden');
+      } else {
+        alert(`{% translate "Error" %}: ${data.message}`);
+        document.getElementById('step-accounts').classList.remove('hidden');
+      }
+    })
+    .catch(error => {
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('step-accounts').classList.remove('hidden');
+      console.error('Error:', error);
+      alert('{% translate "An error occurred while fetching ads" %}');
+    });
+  }
+
+  function displayAds(ads) {
+    const container = document.getElementById('modal-ads-tbody');
+    container.innerHTML = '';
+
+    ads.forEach(ad => {
+      const row = document.createElement('tr');
+      
+      // Truncate ad name
+      const adName = ad.name.length > 30 ? ad.name.substring(0, 30) + '...' : ad.name;
+      
+      // Truncate campaign name
+      const campaignName = ad.campaign_name.length > 25 ? ad.campaign_name.substring(0, 25) + '...' : ad.campaign_name;
+      
+      // Status badge class
+      let statusClass = 'bg-red-100 text-red-800';
+      if (ad.status === 'ACTIVE') {
+        statusClass = 'bg-green-100 text-green-800';
+      } else if (ad.status === 'PAUSED') {
+        statusClass = 'bg-yellow-100 text-yellow-800';
+      }
+      
+      row.innerHTML = `
+        <td class="px-2 py-2 text-sm font-medium text-gray-900">${adName}</td>
+        <td class="px-2 py-2">
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">
+            ${ad.status}
+          </span>
+        </td>
+        <td class="px-2 py-2 text-sm text-gray-500">${campaignName}</td>
+        <td class="px-2 py-2 text-sm text-gray-900">$${ad.spend.toFixed(2)}</td>
+        <td class="px-2 py-2 text-sm text-gray-900">${ad.impressions.toLocaleString()}</td>
+        <td class="px-2 py-2 text-sm text-gray-900">${ad.clicks}</td>
+        <td class="px-2 py-2 text-sm text-gray-900">${ad.ctr.toFixed(2)}%</td>
+      `;
+      container.appendChild(row);
+    });
+
+    document.getElementById('ads-count').textContent = `${ads.length} ads found`;
+  }
+
+  function saveAdsAndClose() {
+    const selectedAccount = document.querySelector('input[name="selected-account"]:checked');
+    if (!selectedAccount) {
+      alert('{% translate "No account selected" %}');
+      return;
+    }
+
+    const appId = document.getElementById('facebook-app-id').value.trim();
+    const token = document.getElementById('facebook-token').value.trim();
+    const accountId = selectedAccount.value;
+
+    // Get CSRF token safely
+    const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenElement ? csrfTokenElement.value : '';
+
+    // Show loading state
+    document.getElementById('step-ads-display').classList.add('hidden');
+    document.getElementById('loading-state').classList.remove('hidden');
+
+    // Save the account and ads
+    fetch('/facebook-ads/api/connect-account/', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        access_token: token,
+        account_id: accountId
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert('{% translate "Facebook ad account connected and ads saved successfully!" %}');
+        closeModal();
+        location.reload(); // Reload to show updated data
+      } else {
+        alert(`{% translate "Error saving account" %}: ${data.message}`);
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('step-ads-display').classList.remove('hidden');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('{% translate "An error occurred while saving the account" %}');
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('step-ads-display').classList.remove('hidden');
+    });
+  }
+
+  function backToAccountsStep() {
+    document.getElementById('step-ads-display').classList.add('hidden');
+    document.getElementById('step-accounts').classList.remove('hidden');
+  }
+
+  function syncFacebookAds() {
+    const btn = document.getElementById('sync-ads-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Syncing...';
+    btn.disabled = true;
+
+    // Get the first account ID from the JSON data
+    const facebookAccounts = JSON.parse(document.getElementById('facebook-accounts').textContent);
+    
+    // Get CSRF token safely
+    const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = csrfTokenElement ? csrfTokenElement.value : '';
+    
+    if (facebookAccounts && facebookAccounts.length > 0) {
+      const accountId = facebookAccounts[0].id;
+      
+      fetch(`/facebook-ads/accounts/${accountId}/sync/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          alert(`Successfully synced ${data.synced_count} ads!`);
+          location.reload(); // Reload to show updated data
+        } else {
+          alert(`Error: ${data.message}`);
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while syncing ads.');
+      })
+      .finally(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      });
+    } else {
+      alert('No Facebook accounts found.');
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  function loadFacebookAdsSummary() {
+    // Only load summary if Facebook ads elements exist (i.e., user has connected accounts)
+    const totalAdsElement = document.getElementById('total-ads');
+    if (!totalAdsElement) {
+      return; // No Facebook accounts connected, skip loading summary
+    }
+
+    fetch('/facebook-ads/api/summary/')
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const summary = data.summary;
+          const totalAds = document.getElementById('total-ads');
+          const activeAds = document.getElementById('active-ads');
+          const totalSpend = document.getElementById('total-spend');
+          const totalImpressions = document.getElementById('total-impressions');
+          
+          if (totalAds) totalAds.textContent = summary.total_ads;
+          if (activeAds) activeAds.textContent = summary.active_ads;
+          if (totalSpend) totalSpend.textContent = `$${summary.total_spend.toFixed(2)}`;
+          if (totalImpressions) totalImpressions.textContent = summary.total_impressions.toLocaleString();
+        }
+      })
+      .catch(error => {
+        console.error('Error loading Facebook ads summary:', error);
+      });
+  }
 </script>
 {% endblock %}

@@ -52,6 +52,7 @@ dependencies = [
     "djangorestframework",
     "djangorestframework-api-key",
     "drf-spectacular",
+    "facebook-business>=22.0.5",
     "psycopg2-binary",
     "redis",
     "stripe<12.0",

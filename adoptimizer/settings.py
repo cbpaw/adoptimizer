@@ -87,6 +87,7 @@ PROJECT_APPS = [
     "apps.utils",
     "apps.web",
     "apps.group_chat",
+    "apps.facebook_ads.apps.FacebookAdsConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PEGASUS_APPS + PROJECT_APPS

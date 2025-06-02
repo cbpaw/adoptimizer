@@ -1,0 +1,151 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+
+{% block app %}
+<section class="app-card">
+    <h1 class="pg-title">{% translate "Manage Facebook Ad Accounts" %}</h1>
+    
+    <div class="mb-6">
+        <button onclick="showFacebookSetup()" class="pg-button-primary">
+            {% translate "Add New Account" %}
+        </button>
+    </div>
+
+    {% if accounts %}
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">{% translate "Connected Accounts" %}</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {% translate "Account Name" %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {% translate "Account ID" %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {% translate "Status" %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {% translate "Connected" %}
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {% translate "Actions" %}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for account in accounts %}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{ account.ad_account_name|default:"Unknown" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ account.ad_account_id }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                                    {% if account.is_active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {% if account.is_active %}{% translate "Active" %}{% else %}{% translate "Inactive" %}{% endif %}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ account.created_at|date:"M d, Y" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button 
+                                    onclick="syncAccount({{ account.id }})" 
+                                    class="text-blue-600 hover:text-blue-900 mr-3"
+                                >
+                                    {% translate "Sync Ads" %}
+                                </button>
+                                <button 
+                                    onclick="testConnection({{ account.id }})" 
+                                    class="text-green-600 hover:text-green-900 mr-3"
+                                >
+                                    {% translate "Test" %}
+                                </button>
+                                <button 
+                                    onclick="removeAccount({{ account.id }})" 
+                                    class="text-red-600 hover:text-red-900"
+                                >
+                                    {% translate "Remove" %}
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-8">
+            <div class="text-gray-500 mb-4">
+                <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">{% translate "No Facebook Ad Accounts" %}</h3>
+            <p class="text-gray-500 mb-4">{% translate "You haven't connected any Facebook ad accounts yet." %}</p>
+            <button onclick="showFacebookSetup()" class="pg-button-primary">
+                {% translate "Connect Your First Account" %}
+            </button>
+        </div>
+    {% endif %}
+</section>
+
+<script>
+function showFacebookSetup() {
+    const appId = prompt('Please enter your Facebook App ID:');
+    if (appId) {
+        window.location.href = `/facebook-ads/auth/start/?app_id=${appId}`;
+    }
+}
+
+function syncAccount(accountId) {
+    if (confirm('This will fetch the latest ads data from Facebook. Continue?')) {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = 'Syncing...';
+        btn.disabled = true;
+
+        fetch(`/facebook-ads/accounts/${accountId}/sync/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Successfully synced ${data.synced_count} ads!`);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while syncing ads.');
+        })
+        .finally(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        });
+    }
+}
+
+function testConnection(accountId) {
+    alert('Connection test feature coming soon!');
+}
+
+function removeAccount(accountId) {
+    if (confirm('Are you sure you want to remove this Facebook ad account? This will also delete all associated ads data.')) {
+        alert('Remove account feature coming soon!');
+    }
+}
+</script>
+{% endblock %} 

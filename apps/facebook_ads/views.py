@@ -132,16 +132,6 @@ def setup_account(request):
 
 
 @login_required
-def manage_accounts(request):
-    """Manage Facebook ad accounts"""
-    accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
-    return render(request, 'facebook_ads/manage_accounts.html', {
-        'accounts': accounts,
-        'active_tab': 'facebook-ads'
-    })
-
-
-@login_required
 @require_http_methods(["POST"])
 def sync_ads(request, account_id):
     """Sync ads for a specific account"""
@@ -492,20 +482,22 @@ def connect_ad_account(request):
             debug_data = debug_response.json()
             app_id = debug_data.get('data', {}).get('app_id', 'unknown')
         
-        # Check if account already exists for this user
+        # Check if account already exists for this user (active or inactive)
         existing_account = FacebookAdAccount.objects.filter(
             user=request.user,
-            ad_account_id=account_id,
-            is_active=True
+            ad_account_id=account_id
         ).first()
         
         if existing_account:
-            # Update existing account
+            # Reactivate and update existing account (whether it was active or inactive)
             existing_account.access_token = access_token
             existing_account.app_id = app_id
             existing_account.ad_account_name = account_info.get('name', '')
+            existing_account.is_active = True  # Reactivate if it was disconnected
             existing_account.save()
             fb_account = existing_account
+            
+            action_message = "reconnected" if not existing_account.is_active else "updated"
         else:
             # Create new account
             fb_account = FacebookAdAccount.objects.create(
@@ -517,6 +509,7 @@ def connect_ad_account(request):
                 app_secret='',  # Not needed for token-based auth
                 is_active=True
             )
+            action_message = "connected"
         
         # Immediately sync some ads to test the connection
         try:
@@ -526,15 +519,15 @@ def connect_ad_account(request):
             
             return Response({
                 'success': True,
-                'message': f'Account connected successfully! Synced {synced_count} ads.',
+                'message': f'Account {action_message} successfully! Synced {synced_count} ads.',
                 'account_id': fb_account.id,
                 'synced_count': synced_count
             })
         except Exception as sync_error:
-            logger.warning(f"Account connected but failed to sync ads: {str(sync_error)}")
+            logger.warning(f"Account {action_message} but failed to sync ads: {str(sync_error)}")
             return Response({
                 'success': True,
-                'message': 'Account connected successfully! You can sync ads manually.',
+                'message': f'Account {action_message} successfully! You can sync ads manually.',
                 'account_id': fb_account.id
             })
         
@@ -657,11 +650,24 @@ def campaign_selection(request):
         is_monitoring=True
     ).values_list('campaign__id', flat=True)
     
+    # Prepare account data with campaigns for each account
+    accounts_with_campaigns = []
+    for account in user_accounts:
+        account_campaigns = campaigns.filter(ad_account=account)
+        selected_count = sum(1 for c in account_campaigns if c.id in selected_campaign_ids)
+        
+        accounts_with_campaigns.append({
+            'account': account,
+            'campaigns': account_campaigns,
+            'campaign_count': account_campaigns.count(),
+            'selected_count': selected_count
+        })
+    
     return render(request, 'facebook_ads/campaign_selection.html', {
-        'campaigns': campaigns,
+        'accounts_with_campaigns': accounts_with_campaigns,
         'selected_campaign_ids': list(selected_campaign_ids),
         'user_accounts': user_accounts,
-        'active_tab': 'facebook-ads'
+        'active_tab': 'campaigns'
     })
 
 
@@ -708,24 +714,46 @@ def fetch_campaigns(request):
                         except:
                             pass
                     
-                    # Update or create campaign
-                    campaign, created = FacebookCampaign.objects.update_or_create(
-                        ad_account=account,
-                        campaign_id=campaign_data['id'],
-                        defaults={
-                            'campaign_name': campaign_data['name'],
-                            'status': campaign_data['status'],
-                            'effective_status': campaign_data.get('effective_status', ''),
-                            'start_time': start_time,
-                        }
-                    )
-                    total_campaigns += 1
-                    
-                    if created:
-                        logger.info(f"Created new campaign: {campaign.campaign_name}")
-                    else:
-                        logger.info(f"Updated campaign: {campaign.campaign_name}")
+                    # Use get_or_create to handle duplicate keys more gracefully
+                    try:
+                        campaign, created = FacebookCampaign.objects.get_or_create(
+                            campaign_id=campaign_data['id'],
+                            defaults={
+                                'ad_account': account,
+                                'campaign_name': campaign_data['name'],
+                                'status': campaign_data['status'],
+                                'effective_status': campaign_data.get('effective_status', ''),
+                                'start_time': start_time,
+                            }
+                        )
                         
+                        # If campaign exists but belongs to different account, update it
+                        if not created and campaign.ad_account != account:
+                            campaign.ad_account = account
+                            campaign.campaign_name = campaign_data['name']
+                            campaign.status = campaign_data['status']
+                            campaign.effective_status = campaign_data.get('effective_status', '')
+                            campaign.start_time = start_time
+                            campaign.save()
+                            logger.info(f"Transferred campaign to new account: {campaign.campaign_name}")
+                        elif not created:
+                            # Update existing campaign data
+                            campaign.campaign_name = campaign_data['name']
+                            campaign.status = campaign_data['status']
+                            campaign.effective_status = campaign_data.get('effective_status', '')
+                            campaign.start_time = start_time
+                            campaign.save()
+                            logger.info(f"Updated existing campaign: {campaign.campaign_name}")
+                        
+                        total_campaigns += 1
+                        
+                        if created:
+                            logger.info(f"Created new campaign: {campaign.campaign_name}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error processing campaign {campaign_data.get('id', 'unknown')}: {str(e)}")
+                        continue
+                    
             except Exception as e:
                 logger.error(f"Error fetching campaigns for account {account.ad_account_id}: {str(e)}")
                 continue
@@ -909,6 +937,193 @@ def test_account_connection(request):
         
     except Exception as e:
         logger.error(f"Error testing account connection: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def fetch_campaigns_for_account(request):
+    """Fetch campaigns from Meta Marketing API for a specific account"""
+    try:
+        account_id = request.data.get('account_id')
+        
+        if not account_id:
+            return Response({
+                'success': False,
+                'message': 'Account ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the specific account
+        account = FacebookAdAccount.objects.filter(
+            id=account_id,
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not account:
+            return Response({
+                'success': False,
+                'message': 'Account not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        campaigns_synced = 0
+        
+        try:
+            # Make API call to Facebook to get campaigns for this specific account
+            url = f'https://graph.facebook.com/v19.0/act_{account.ad_account_id}/campaigns'
+            params = {
+                'access_token': account.access_token,
+                'fields': 'id,name,status,effective_status,start_time,updated_time',
+                'limit': 100
+            }
+            
+            response = requests.get(url, params=params)
+            
+            if response.status_code != 200:
+                logger.error(f"Facebook API error for account {account.ad_account_id}: {response.text}")
+                return Response({
+                    'success': False,
+                    'message': f'Failed to fetch campaigns from Facebook: {response.text}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            facebook_data = response.json()
+            
+            for campaign_data in facebook_data.get('data', []):
+                # Parse start_time if it exists
+                start_time = None
+                if campaign_data.get('start_time'):
+                    try:
+                        from datetime import datetime
+                        start_time = datetime.fromisoformat(campaign_data['start_time'].replace('Z', '+00:00'))
+                    except:
+                        pass
+                
+                # Use get_or_create to handle duplicate keys more gracefully
+                try:
+                    campaign, created = FacebookCampaign.objects.get_or_create(
+                        campaign_id=campaign_data['id'],
+                        defaults={
+                            'ad_account': account,
+                            'campaign_name': campaign_data['name'],
+                            'status': campaign_data['status'],
+                            'effective_status': campaign_data.get('effective_status', ''),
+                            'start_time': start_time,
+                        }
+                    )
+                    
+                    # If campaign exists but belongs to different account, update it
+                    if not created and campaign.ad_account != account:
+                        campaign.ad_account = account
+                        campaign.campaign_name = campaign_data['name']
+                        campaign.status = campaign_data['status']
+                        campaign.effective_status = campaign_data.get('effective_status', '')
+                        campaign.start_time = start_time
+                        campaign.save()
+                        logger.info(f"Transferred campaign to new account: {campaign.campaign_name}")
+                    elif not created:
+                        # Update existing campaign data
+                        campaign.campaign_name = campaign_data['name']
+                        campaign.status = campaign_data['status']
+                        campaign.effective_status = campaign_data.get('effective_status', '')
+                        campaign.start_time = start_time
+                        campaign.save()
+                        logger.info(f"Updated existing campaign: {campaign.campaign_name}")
+                    
+                    campaigns_synced += 1
+                    
+                    if created:
+                        logger.info(f"Created new campaign: {campaign.campaign_name}")
+                        
+                except Exception as e:
+                    logger.error(f"Error processing campaign {campaign_data.get('id', 'unknown')}: {str(e)}")
+                    continue
+            
+        except Exception as e:
+            logger.error(f"Error fetching campaigns for account {account.ad_account_id}: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Error fetching campaigns: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({
+            'success': True,
+            'message': f'Successfully synced {campaigns_synced} campaigns for {account.ad_account_name}',
+            'campaigns_synced': campaigns_synced,
+            'account_name': account.ad_account_name
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_campaigns_for_account: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_account_campaigns(request):
+    """Get campaigns for a specific account with their selection status"""
+    try:
+        account_id = request.GET.get('account_id')
+        
+        if not account_id:
+            return Response({
+                'success': False,
+                'message': 'Account ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the specific account
+        account = FacebookAdAccount.objects.filter(
+            id=account_id,
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not account:
+            return Response({
+                'success': False,
+                'message': 'Account not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get campaigns for this account
+        campaigns = FacebookCampaign.objects.filter(ad_account=account).order_by('campaign_name')
+        
+        # Get currently selected campaigns
+        selected_campaign_ids = SelectedCampaign.objects.filter(
+            user=request.user,
+            is_monitoring=True,
+            campaign__ad_account=account
+        ).values_list('campaign__id', flat=True)
+        
+        # Serialize campaigns data
+        campaigns_data = []
+        for campaign in campaigns:
+            campaigns_data.append({
+                'id': campaign.id,
+                'campaign_id': campaign.campaign_id,
+                'campaign_name': campaign.campaign_name,
+                'status': campaign.status,
+                'effective_status': campaign.effective_status,
+                'start_time': campaign.start_time.isoformat() if campaign.start_time else None,
+                'last_synced': campaign.last_synced.isoformat() if campaign.last_synced else None,
+            })
+        
+        selected_count = sum(1 for c in campaigns if c.id in selected_campaign_ids)
+        
+        return Response({
+            'success': True,
+            'campaigns': campaigns_data,
+            'campaign_count': campaigns.count(),
+            'selected_count': selected_count,
+            'selected_campaign_ids': list(selected_campaign_ids)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting account campaigns: {str(e)}")
         return Response({
             'success': False,
             'message': f'An error occurred: {str(e)}'

@@ -32,9 +32,6 @@ class FacebookCampaign(BaseModel):
     start_time = models.DateTimeField(null=True, blank=True)
     last_synced = models.DateTimeField(auto_now=True)
     
-    class Meta:
-        unique_together = ['ad_account', 'campaign_id']
-    
     def __str__(self):
         return f"{self.campaign_name} ({self.campaign_id})"
 

@@ -12,6 +12,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+import json
 
 from .models import FacebookAdAccount, FacebookAd, FacebookCampaign, SelectedCampaign
 from .services import FacebookMarketingAPIService, get_facebook_auth_url, exchange_code_for_token
@@ -294,7 +295,77 @@ def get_ads_summary(request):
 def fetch_ad_accounts(request):
     """Fetch ad accounts from Facebook using access token"""
     try:
+        logger.info("Starting fetch_ad_accounts request")
+        
         # Use DRF's request.data instead of json.loads(request.body)
+        access_token = request.data.get('access_token')
+        
+        if not access_token:
+            logger.warning("No access token provided")
+            return Response({
+                'success': False,
+                'message': 'Access token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"Access token received (length: {len(access_token)})")
+        
+        # Make API call to Facebook to get ad accounts using the correct endpoint
+        api_version = 'v19.0'
+        url = f'https://graph.facebook.com/{api_version}/me/adaccounts'
+        params = {
+            'access_token': access_token,
+            'fields': 'id,account_id,name,account_status'
+        }
+        
+        logger.info(f"Making Facebook API call to: {url}")
+        response = requests.get(url, params=params)
+        logger.info(f"Facebook API response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"Facebook API error: {response.text}")
+            return Response({
+                'success': False,
+                'message': f'Failed to fetch ad accounts from Facebook: {response.text}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        facebook_data = response.json()
+        logger.info(f"Facebook API returned {len(facebook_data.get('data', []))} accounts")
+        
+        accounts = []
+        
+        for account_data in facebook_data.get('data', []):
+            # Extract account ID (remove 'act_' prefix if present)
+            account_id = account_data.get('account_id', account_data['id'])
+            if account_id.startswith('act_'):
+                account_id = account_id[4:]
+            
+            accounts.append({
+                'id': account_id,
+                'name': account_data['name'],
+                'account_status': account_data.get('account_status'),
+                'full_id': account_data['id']  # Keep the full ID for reference
+            })
+        
+        logger.info(f"Successfully processed {len(accounts)} accounts")
+        
+        return Response({
+            'success': True,
+            'accounts': accounts
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching ad accounts: {str(e)}", exc_info=True)
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def test_token(request):
+    """Test and validate a Facebook access token"""
+    try:
         access_token = request.data.get('access_token')
         
         if not access_token:
@@ -303,41 +374,68 @@ def fetch_ad_accounts(request):
                 'message': 'Access token is required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Make API call to Facebook to get ad accounts
-        url = f'https://graph.facebook.com/v19.0/me/adaccounts'
-        params = {
-            'access_token': access_token,
-            'fields': 'id,name,account_status,currency,timezone_name'
+        # Test the token by calling Facebook's debug endpoint
+        api_version = 'v19.0'
+        debug_url = f'https://graph.facebook.com/{api_version}/debug_token'
+        debug_params = {
+            'input_token': access_token,
+            'access_token': access_token  # Use the same token to debug itself
         }
         
-        response = requests.get(url, params=params)
+        debug_response = requests.get(debug_url, params=debug_params)
         
-        if response.status_code != 200:
-            logger.error(f"Facebook API error: {response.text}")
+        if debug_response.status_code != 200:
+            logger.error(f"Facebook debug token API error: {debug_response.text}")
             return Response({
                 'success': False,
-                'message': 'Failed to fetch ad accounts from Facebook'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': 'Invalid access token'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
-        facebook_data = response.json()
-        accounts = []
+        debug_data = debug_response.json()
+        token_data = debug_data.get('data', {})
         
-        for account_data in facebook_data.get('data', []):
-            accounts.append({
-                'id': account_data['id'],
-                'name': account_data['name'],
-                'account_status': account_data.get('account_status'),
-                'currency': account_data.get('currency'),
-                'timezone': account_data.get('timezone_name')
-            })
+        if not token_data.get('is_valid'):
+            return Response({
+                'success': False,
+                'message': 'Token is not valid'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get additional user and app info
+        me_url = f'https://graph.facebook.com/{api_version}/me'
+        me_params = {
+            'access_token': access_token,
+            'fields': 'id,name'
+        }
+        
+        me_response = requests.get(me_url, params=me_params)
+        me_data = {}
+        if me_response.status_code == 200:
+            me_data = me_response.json()
+        
+        # Format expiration time if available
+        expires_at = 'Never'
+        if token_data.get('expires_at'):
+            try:
+                from datetime import datetime
+                expires_timestamp = int(token_data['expires_at'])
+                expires_at = datetime.fromtimestamp(expires_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                expires_at = 'Unknown'
         
         return Response({
             'success': True,
-            'accounts': accounts
+            'message': 'Token is valid',
+            'app_id': token_data.get('app_id'),
+            'app_name': token_data.get('application'),
+            'user_id': token_data.get('user_id'),
+            'user_name': me_data.get('name', 'Unknown'),
+            'permissions': token_data.get('scopes', []),
+            'expires_at': expires_at,
+            'is_valid': token_data.get('is_valid', False)
         })
         
     except Exception as e:
-        logger.error(f"Error fetching ad accounts: {str(e)}")
+        logger.error(f"Error testing token: {str(e)}")
         return Response({
             'success': False,
             'message': f'An error occurred: {str(e)}'
@@ -350,14 +448,13 @@ def connect_ad_account(request):
     """Connect a Facebook ad account to the user"""
     try:
         # Use DRF's request.data instead of json.loads(request.body)
-        app_id = request.data.get('app_id')
         access_token = request.data.get('access_token')
         account_id = request.data.get('account_id')
         
-        if not all([app_id, access_token, account_id]):
+        if not all([access_token, account_id]):
             return Response({
                 'success': False,
-                'message': 'App ID, access token, and account ID are required'
+                'message': 'Access token and account ID are required'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Remove 'act_' prefix if present
@@ -381,6 +478,19 @@ def connect_ad_account(request):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         account_info = response.json()
+        
+        # Get app_id from the access token debug endpoint
+        debug_url = f'https://graph.facebook.com/v19.0/debug_token'
+        debug_params = {
+            'input_token': access_token,
+            'access_token': access_token
+        }
+        
+        debug_response = requests.get(debug_url, params=debug_params)
+        app_id = 'unknown'
+        if debug_response.status_code == 200:
+            debug_data = debug_response.json()
+            app_id = debug_data.get('data', {}).get('app_id', 'unknown')
         
         # Check if account already exists for this user
         existing_account = FacebookAdAccount.objects.filter(
@@ -686,8 +796,12 @@ def settings(request):
     """Settings page for Facebook ads configuration"""
     user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
     
+    # Prepare existing account IDs as JSON for the template
+    existing_account_ids = [account.ad_account_id for account in user_accounts]
+    
     return render(request, 'facebook_ads/settings.html', {
         'user_accounts': user_accounts,
+        'existing_account_ids_json': json.dumps(existing_account_ids),
         'active_tab': 'settings'
     })
 
@@ -735,6 +849,66 @@ def disconnect_account(request):
         
     except Exception as e:
         logger.error(f"Error disconnecting account: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def test_account_connection(request):
+    """Test connection to a Facebook ad account"""
+    try:
+        account_id = request.data.get('account_id')
+        
+        if not account_id:
+            return Response({
+                'success': False,
+                'message': 'Account ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the account and verify it belongs to the user
+        account = FacebookAdAccount.objects.filter(
+            id=account_id,
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not account:
+            return Response({
+                'success': False,
+                'message': 'Account not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Test the connection by calling Facebook API
+        api_version = 'v19.0'
+        url = f'https://graph.facebook.com/{api_version}/act_{account.ad_account_id}'
+        params = {
+            'access_token': account.access_token,
+            'fields': 'id,name,account_status'
+        }
+        
+        response = requests.get(url, params=params)
+        
+        if response.status_code != 200:
+            logger.error(f"Facebook API error testing account {account.ad_account_id}: {response.text}")
+            return Response({
+                'success': False,
+                'message': 'Failed to connect to Facebook account. Token may be expired or invalid.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        account_data = response.json()
+        
+        return Response({
+            'success': True,
+            'message': 'Account connection test successful',
+            'account_name': account_data.get('name', account.ad_account_name),
+            'account_status': account_data.get('account_status', 'Unknown')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing account connection: {str(e)}")
         return Response({
             'success': False,
             'message': f'An error occurred: {str(e)}'

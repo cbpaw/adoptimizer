@@ -22,8 +22,10 @@ urlpatterns = [
     # API endpoints
     path('api/ads/', views.get_user_ads, name='api_ads'),
     path('api/summary/', views.get_ads_summary, name='api_summary'),
+    path('api/test-token/', views.test_token, name='api_test_token'),
     path('api/fetch-accounts/', views.fetch_ad_accounts, name='api_fetch_accounts'),
     path('api/connect-account/', views.connect_ad_account, name='api_connect_account'),
+    path('api/test-account-connection/', views.test_account_connection, name='api_test_account_connection'),
     path('api/fetch-ads/', views.fetch_ads_from_facebook, name='api_fetch_ads'),
     path('api/fetch-campaigns/', views.fetch_campaigns, name='api_fetch_campaigns'),
     path('api/save-selected-campaigns/', views.save_selected_campaigns, name='api_save_selected_campaigns'),

@@ -13,6 +13,12 @@ def handle_sign_up(request, user, **kwargs):
     # customize this function to do custom logic on sign up, e.g. send a welcome email
     # or subscribe them to your mailing list.
     # This example notifies the admins, in case you want to keep track of sign ups
+    
+    # Set default timezone for new users
+    if not user.timezone:
+        user.timezone = "Europe/Amsterdam"
+        user.save()
+    
     _notify_admins_of_signup(user)
 
 

@@ -38,5 +38,9 @@ class UserTimezoneMiddleware:
             if user.timezone:
                 timezone.activate(zoneinfo.ZoneInfo(user.timezone))
             else:
-                timezone.deactivate()
+                # Default to Europe/Amsterdam if user hasn't set a timezone
+                timezone.activate(zoneinfo.ZoneInfo("Europe/Amsterdam"))
+        else:
+            # For anonymous users, also default to Europe/Amsterdam
+            timezone.activate(zoneinfo.ZoneInfo("Europe/Amsterdam"))
         return self.get_response(request)

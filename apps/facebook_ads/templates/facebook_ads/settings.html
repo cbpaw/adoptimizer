@@ -1032,14 +1032,37 @@ function connectSelectedAccountsFromModal() {
   .then(results => {
     const successful = results.filter(r => r.success).length;
     const failed = results.length - successful;
+    const totalAttempted = results.length;
     
     if (successful > 0) {
-      showSuccess(`${successful} account(s) succesvol gekoppeld!${failed > 0 ? ` ${failed} account(s) gefaald.` : ''}`);
+      if (totalAttempted === 1) {
+        const result = results[0];
+        // Show notification popup for single account
+        showSuccess(result.message || 'Account succesvol gekoppeld!');
+      } else {
+        // Show notification popup for multiple accounts
+        showSuccess(`${successful} account(s) succesvol gekoppeld!${failed > 0 ? ` ${failed} account(s) gefaald.` : ''}`);
+      }
       closeAccountSelectionModal();
       clearTokenForm();
-      location.reload(); // Refresh to show new accounts
+      
+      // Dynamically refresh accounts list instead of page reload
+      setTimeout(() => {
+        refreshAccountsList();
+      }, 1500); // Give time for user to see notification
     } else {
-      showError('Alle accounts koppelen is mislukt. Controleer uw token en probeer opnieuw.');
+      if (totalAttempted === 1) {
+        const result = results[0];
+        const errorMessage = result.message || 'Account koppelen mislukt';
+        showError(`Koppelen van account mislukt: ${errorMessage}`);
+      } else {
+        // Show individual error messages for failed accounts
+        const errorMessages = results
+          .filter(r => !r.success)
+          .map(r => r.message || 'Onbekende fout')
+          .join(', ');
+        showError(`Koppelen van ${totalAttempted} account(s) mislukt: ${errorMessages}`);
+      }
     }
   })
   .catch(error => {
@@ -1186,7 +1209,10 @@ function confirmDisconnectAccount() {
     if (data.success) {
       showSuccess('Account succesvol ontkoppeld!');
       closeDisconnectModal();
-      location.reload();
+      // Dynamically refresh accounts list
+      setTimeout(() => {
+        refreshAccountsList();
+      }, 1000);
     } else {
       showError(`Error: ${data.message}`);
     }
@@ -1204,6 +1230,102 @@ function confirmDisconnectAccount() {
   .finally(() => {
     confirmBtn.innerHTML = originalText;
     confirmBtn.disabled = false;
+  });
+}
+
+// Dynamic refresh function for accounts list
+function refreshAccountsList() {
+  // Show loading indicator
+  const accountsContainer = document.querySelector('#accounts-tab .grid');
+  const accountsCountSpan = document.querySelector('#accounts-tab h3 + span');
+  
+  if (accountsContainer) {
+    accountsContainer.innerHTML = '<div class="col-span-full text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-muted-foreground"></i><p class="mt-2 text-muted-foreground">Accounts bijwerken...</p></div>';
+  }
+  
+  // Fetch fresh account data
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  
+  fetch(window.location.href, {
+    method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    credentials: 'same-origin'
+  })
+  .then(response => response.text())
+  .then(html => {
+    // Parse the response HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Extract the new accounts section
+    const newAccountsContainer = doc.querySelector('#accounts-tab .grid');
+    const newAccountsCount = doc.querySelector('#accounts-tab h3 + span');
+    const newExistingAccountsData = doc.querySelector('#existing-accounts-data');
+    
+    if (newAccountsContainer && accountsContainer) {
+      // Update accounts list
+      accountsContainer.innerHTML = newAccountsContainer.innerHTML;
+      
+      // Update accounts count
+      if (newAccountsCount && accountsCountSpan) {
+        accountsCountSpan.textContent = newAccountsCount.textContent;
+      }
+      
+      // Update existing accounts data for modal functionality
+      if (newExistingAccountsData) {
+        const existingDataElement = document.getElementById('existing-accounts-data');
+        if (existingDataElement) {
+          existingDataElement.dataset.accountIds = newExistingAccountsData.dataset.accountIds;
+        }
+      }
+      
+      // Re-attach event listeners for disconnect buttons
+      document.querySelectorAll('.disconnect-account-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const accountId = this.getAttribute('data-account-id');
+          const accountName = this.getAttribute('data-account-name');
+          disconnectAccount(accountId, accountName);
+        });
+      });
+      
+      // Check if we need to show empty state or grid
+      const accountCards = accountsContainer.querySelectorAll('[data-slot="card"]');
+      if (accountCards.length === 0) {
+        // Show empty state
+        accountsContainer.innerHTML = `
+          <div class="col-span-full text-center py-16">
+            <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+              <i class="fab fa-facebook text-4xl text-muted-foreground"></i>
+            </div>
+            <h3 class="text-xl font-medium mb-2">Geen Ad Accounts Gekoppeld</h3>
+            <p class="text-muted-foreground mb-6 max-w-md mx-auto">
+              Voeg uw Facebook access token toe om ad accounts aan het dashboard te koppelen en uw campagnes te beheren.
+            </p>
+            <button 
+              onclick="switchTab('token')" 
+              class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
+              data-slot="button"
+            >
+              <i class="fas fa-plus mr-2"></i>
+              Eerste Account Toevoegen
+            </button>
+          </div>
+        `;
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error refreshing accounts list:', error);
+    showError('Fout bij het bijwerken van de accounts lijst');
+    
+    // Restore original content on error
+    if (accountsContainer) {
+      setTimeout(() => {
+        location.reload(); // Fallback to page reload on error
+      }, 2000);
+    }
   });
 }
 

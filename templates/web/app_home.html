@@ -395,9 +395,6 @@
                 <button onclick="syncFacebookAds()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button" id="sync-ads-btn">
                     {% translate "Sync Campaigns" %}
                 </button>
-                <a href="{% url 'facebook_ads:manage_accounts' %}" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button">
-                    {% translate "Manage Accounts" %}
-                </a>
                 <a href="{% url 'facebook_ads:campaign_selection' %}" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button">
                     <i class="fa fa-bullhorn mr-1"></i>
                     {% translate "Manage Campaigns" %}

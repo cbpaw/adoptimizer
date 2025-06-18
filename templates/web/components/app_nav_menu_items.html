@@ -9,26 +9,10 @@
   </a>
 </li>
 <li>
-  <details {% if active_tab == 'facebook-ads' %}open{% endif %}>
-    <summary>
-      <i class="fa-brands fa-facebook h-4 w-4"></i>
-      {% translate "Facebook Ads" %}
-    </summary>
-    <ul>
-      <li>
-        <a href="{% url 'facebook_ads:manage_accounts' %}" {% if active_tab == 'facebook-ads' and 'accounts' in request.path %}class="menu-active"{% endif %}>
-          <i class="fa fa-link h-4 w-4"></i>
-          Accounts
-        </a>
-      </li>
-      <li>
-        <a href="{% url 'facebook_ads:campaign_selection' %}" {% if active_tab == 'facebook-ads' and 'campaigns' in request.path %}class="menu-active"{% endif %}>
-          <i class="fa fa-bullhorn h-4 w-4"></i>
-          Campagne Selectie
-        </a>
-      </li>
-    </ul>
-  </details>
+  <a href="{% url 'facebook_ads:campaign_selection' %}" {% if active_tab == 'campaigns' %}class="menu-active"{% endif %}>
+    <i class="fa fa-bullhorn h-4 w-4"></i>
+    {% translate "Campagnes" %}
+  </a>
 </li>
 <li>
   <a href="{% url 'facebook_ads:settings' %}" {% if active_tab == 'settings' %}class="menu-active"{% endif %}>

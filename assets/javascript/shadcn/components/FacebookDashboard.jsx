@@ -58,9 +58,6 @@ export default function FacebookDashboard({
                   <Button variant="outline" onClick={onSyncFacebookAds}>
                     Sync Ads
                   </Button>
-                  <Button variant="outline" asChild>
-                    <a href="/facebook-ads/manage-accounts/">Manage Accounts</a>
-                  </Button>
                 </>
               )}
             </div>

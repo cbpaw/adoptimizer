@@ -1,1448 +1,433 @@
 {% extends "web/app/app_base.html" %}
 {% load i18n %}
 {% load static %}
+{% load django_vite %}
 
 {% block title %}{% translate "Facebook Ads Instellingen" %}{% endblock %}
 
 {% block app %}
+<!-- Hidden form for CSRF token -->
+<form style="display: none;">
+    {% csrf_token %}
+</form>
+
+<!-- Existing accounts data for JavaScript access -->
+<div id="existing-accounts-data" 
+     data-account-ids="{% for account in user_accounts %}{{ account.ad_account_id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     data-db-account-ids="{% for account in user_accounts %}{{ account.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     data-user-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}"
+     style="display: none;"></div>
+
 <div class="space-y-6">
-  <!-- Header Card -->
-  <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
-    <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
-      <div class="leading-none font-semibold text-2xl" data-slot="card-title">{% translate "Facebook Ads Instellingen" %}</div>
-      <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Beheer uw Facebook token en ad accounts" %}</div>
-    </div>
-  </div>
-
-  {% if not user.is_authenticated %}
-  <!-- User Not Logged In Warning -->
-  <div class="border-l-4 border-red-400 bg-red-50 p-4 rounded-md" data-slot="alert">
-    <div class="flex items-start">
-      <div class="flex-shrink-0">
-        <i class="fas fa-exclamation-triangle text-red-500 mt-0.5"></i>
-      </div>
-      <div class="ml-3" data-slot="alert-description">
-        <h4 class="text-sm font-medium text-red-900">{% translate "Niet Ingelogd" %}</h4>
-        <p class="text-sm text-red-700 mt-1">
-          {% translate "U moet ingelogd zijn om Facebook ad accounts te beheren." %}
-          <a href="{% url 'account_login' %}" class="underline font-medium">{% translate "Log hier in" %}</a>
-        </p>
-      </div>
-    </div>
-  </div>
-  {% else %}
-
-  <!-- Tabs Section -->
-  <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
-    <div class="px-6">
-      <!-- Tab Navigation -->
-      <div class="flex flex-col gap-2" data-slot="tabs">
-        <div class="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-1 mb-6" data-slot="tabs-list">
-          <button 
-            class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm bg-background text-foreground shadow-sm"
-            data-tab="token"
-            data-slot="tabs-trigger"
-            data-state="active"
-            onclick="switchTab('token')"
-          >
-            <i class="fas fa-key mr-1"></i>
-            {% translate "Token Beheer" %}
-          </button>
-          <button 
-            class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm text-muted-foreground"
-            data-tab="accounts"
-            data-slot="tabs-trigger"
-            data-state="inactive"
-            onclick="switchTab('accounts')"
-          >
-            <i class="fas fa-link mr-1"></i>
-            {% translate "Ad Accounts" %}
-          </button>
+    <!-- Header Card -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="leading-none font-semibold text-2xl" data-slot="card-title">{% translate "Facebook Ads Instellingen" %}</div>
+            <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Beheer uw Facebook token en ad accounts" %}</div>
         </div>
+    </div>
 
-        <!-- Token Management Tab Content -->
-        <div id="token-tab" class="tab-content flex-1 outline-none" data-slot="tabs-content" style="display: block;">
-          <div>
-            
-            <!-- Token Add/Test Form -->
-            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm mb-6" data-slot="card">
-              <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
-                <div class="leading-none font-semibold" data-slot="card-title">{% translate "Facebook Access Token" %}</div>
-                <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Voeg een Facebook access token toe om ad accounts te koppelen" %}</div>
-              </div>
-              <div class="px-6" data-slot="card-content">
-                <form id="token-management-form" class="space-y-4">
-                  {% csrf_token %}
-                  
-                  <!-- Token Input -->
-                  <div class="space-y-2">
-                    <label class="text-sm font-medium">{% translate "Access Token" %}</label>
-                    <textarea 
-                      id="access-token-input" 
-                      class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50" 
-                      placeholder="{% translate 'Plak hier uw Facebook access token...' %}"
-                      required
-                    >{% if user_accounts %}{{ user_accounts.0.access_token }}{% endif %}</textarea>
-                    <div class="text-xs text-muted-foreground">
-                      {% if user_accounts %}
-                        {% blocktranslate trimmed %}
-                          <strong>Huidige token getoond.</strong> U kunt deze bijwerken door een nieuwe token in te voeren en op "Token Valideren & Accounts Ophalen" te klikken.
-                        {% endblocktranslate %}
-                        <br>
-                      {% endif %}
-                      {% blocktranslate trimmed %}
-                        Genereer een token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="text-primary hover:underline">Facebook Graph API Explorer</a>
-                      {% endblocktranslate %}
-                    </div>
-                  </div>
-                  
-                  <!-- Token Validation Results -->
-                  <div id="token-validation-results" class="hidden space-y-2">
-                    <label class="text-sm font-medium">{% translate "Token Validatie" %}</label>
-                    <div class="p-3 bg-muted rounded-md">
-                      <div class="text-sm" id="validation-content"></div>
-                    </div>
-                  </div>
-                  
-                  <!-- Action Buttons -->
-                  <div class="flex flex-wrap gap-3">
-                    <button 
-                      type="button" 
-                      onclick="validateToken()"
-                      class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
-                      data-slot="button"
-                      id="validate-token-btn"
-                    >
-                      <i class="fas fa-check mr-1"></i>
-                      {% translate "Token Valideren" %}
-                    </button>
-                    <button 
-                      type="button" 
-                      onclick="fetchAccountsModal()"
-                      class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow-xs hover:bg-green-700 h-9 px-4 py-2"
-                      data-slot="button"
-                      id="fetch-accounts-btn"
-                      disabled
-                    >
-                      <i class="fas fa-download mr-1"></i>
-                      {% translate "Accounts Ophalen" %}
-                    </button>
-                    <button 
-                      type="button" 
-                      onclick="clearTokenForm()"
-                      class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
-                      data-slot="button"
-                    >
-                      <i class="fas fa-eraser mr-1"></i>
-                      {% translate "Wissen" %}
-                    </button>
-                    <button 
-                      type="button" 
-                      onclick="window.testAPI()"
-                      class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-orange-400 bg-orange-50 text-orange-700 shadow-xs hover:bg-orange-100 h-9 px-4 py-2"
-                      data-slot="button"
-                      title="Test API connectivity - check console for details"
-                    >
-                      <i class="fas fa-bug mr-1"></i>
-                      {% translate "Debug API" %}
-                    </button>
-                  </div>
-                </form>
-              </div>
+    {% if not user.is_authenticated %}
+    <!-- User Not Logged In Warning -->
+    <div class="border-l-4 border-red-400 bg-red-50 p-4 rounded-md" data-slot="alert">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-red-500 mt-0.5"></i>
             </div>
-
-            <!-- Info Alert -->
-            <div class="border-l-4 border-blue-400 bg-blue-50 p-4 rounded-md" data-slot="alert">
-              <div class="flex items-start">
-                <div class="flex-shrink-0">
-                  <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
-                </div>
-                <div class="ml-3" data-slot="alert-description">
-                  <h4 class="text-sm font-medium text-blue-900">{% translate "Multi-User Dashboard" %}</h4>
-                  <p class="text-sm text-blue-700 mt-1">
-                    {% translate "Momenteel ondersteunt het dashboard één gebruiker. In de toekomst kunnen meerdere gebruikers hetzelfde dashboard delen." %}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Ad Accounts Management Tab Content -->
-        <div id="accounts-tab" class="tab-content flex-1 outline-none" data-slot="tabs-content" style="display: none;">
-          <div>
-            <div class="flex justify-between items-center mb-6">
-              <h3 class="text-lg font-semibold">{% translate "Dashboard Ad Accounts" %}</h3>
-              <span class="text-sm text-muted-foreground">
-                {{ user_accounts|length|default:0 }} account{{ user_accounts|length|pluralize }} {% translate "gekoppeld" %}
-              </span>
-            </div>
-            
-            {% if user_accounts %}
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {% for account in user_accounts %}
-                  <!-- Account Card -->
-                  <div class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm" data-slot="card">
-                    <!-- Card Header -->
-                    <div class="px-6 pt-6" data-slot="card-header">
-                      <div class="flex items-start justify-between">
-                        <h4 class="text-lg font-medium flex items-center gap-2">
-                          <i class="fab fa-facebook text-blue-600"></i>
-                          {{ account.ad_account_name }}
-                        </h4>
-                        
-                        <!-- Status and Refresh Button - Top Right -->
-                        <div class="flex items-center gap-2">
-                          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
-                            <i class="fas fa-check-circle mr-1"></i>
-                            {% translate "Actief" %}
-                          </span>
-                          <button 
-                            onclick="refreshAccountStatus('{{ account.id }}')"
-                            class="cursor-pointer inline-flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors p-1 rounded"
-                            title="{% translate 'Status vernieuwen' %}"
-                          >
-                            <i class="fas fa-sync-alt"></i>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <!-- Card Content - Takes up remaining space -->
-                    <div class="px-6 flex-1" data-slot="card-content">
-                      <div class="mt-3 space-y-2">
-                        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                          <i class="fas fa-hashtag w-4 flex-shrink-0"></i>
-                          <span class="font-medium">{% translate "Account ID:" %}</span> 
-                          <code class="bg-muted px-1 py-0.5 rounded text-xs">{{ account.ad_account_id }}</code>
-                        </div>
-                        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                          <i class="fas fa-mobile-alt w-4 flex-shrink-0"></i>
-                          <span class="font-medium">{% translate "App ID:" %}</span> 
-                          <code class="bg-muted px-1 py-0.5 rounded text-xs">{{ account.app_id }}</code>
-                        </div>
-                        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                          <i class="fas fa-calendar w-4 flex-shrink-0"></i>
-                          <span class="font-medium">{% translate "Toegevoegd:" %}</span> 
-                          <span class="text-xs">{{ account.created_at|date:"d M Y H:i" }}</span>
-                        </div>
-                        <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                          <i class="fas fa-user w-4 flex-shrink-0"></i>
-                          <span class="font-medium">{% translate "Gebruiker:" %}</span> 
-                          <span class="text-xs">{{ account.user.get_full_name|default:account.user.username }}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <!-- Card Footer - Only Action Buttons -->
-                    <div class="px-6 pb-6" data-slot="card-footer">
-                      <div class="pt-6 border-t mt-4">
-                        <!-- Actions Row -->
-                        <div class="flex gap-2">
-                          <button 
-                            onclick="testAccountConnection('{{ account.id }}')"
-                            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 flex-1"
-                            data-slot="button"
-                            title="{% translate 'Verbinding testen' %}"
-                          >
-                            <i class="fas fa-link text-xs"></i>
-                            {% translate "Test" %}
-                          </button>
-                          <button 
-                            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 h-9 px-3 flex-1 disconnect-account-btn"
-                            data-slot="button"
-                            data-account-id="{{ account.id }}"
-                            data-account-name="{{ account.ad_account_name }}"
-                            title="{% translate 'Account ontkoppelen' %}"
-                          >
-                            <i class="fas fa-unlink text-xs"></i>
-                            {% translate "Ontkoppelen" %}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <!-- Empty State -->
-              <div class="text-center py-16">
-                <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-                  <i class="fab fa-facebook text-4xl text-muted-foreground"></i>
-                </div>
-                <h3 class="text-xl font-medium mb-2">{% translate "Geen Ad Accounts Gekoppeld" %}</h3>
-                <p class="text-muted-foreground mb-6 max-w-md mx-auto">
-                  {% translate "Voeg uw Facebook access token toe om ad accounts aan het dashboard te koppelen en uw campagnes te beheren." %}
+            <div class="ml-3" data-slot="alert-description">
+                <h4 class="text-sm font-medium text-red-900">{% translate "Niet Ingelogd" %}</h4>
+                <p class="text-sm text-red-700 mt-1">
+                    {% translate "U moet ingelogd zijn om Facebook ad accounts te beheren." %}
+                    <a href="{% url 'account_login' %}" class="underline font-medium">{% translate "Log hier in" %}</a>
                 </p>
-                <button 
-                  onclick="switchTab('token')" 
-                  class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
-                  data-slot="button"
-                >
-                  <i class="fas fa-plus mr-2"></i>
-                  {% translate "Eerste Account Toevoegen" %}
-                </button>
-              </div>
-            {% endif %}
-          </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
-  {% endif %}
-</div>
+    {% else %}
 
-<!-- Hidden data for JavaScript -->
-<div id="existing-accounts-data" data-account-ids='{{ existing_account_ids_json|safe }}' data-user-authenticated="{% if user.is_authenticated %}true{% else %}false{% endif %}" style="display: none;"></div>
+    <!-- Tabs Section -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="px-6">
+            <!-- Tab Navigation -->
+            <div class="flex flex-col gap-2" data-slot="tabs">
+                <div class="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-1 mb-6" data-slot="tabs-list">
+                    <button 
+                        class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm bg-background text-foreground shadow-sm"
+                        data-tab="token"
+                        data-slot="tabs-trigger"
+                        data-state="active"
+                        onclick="switchTab('token')"
+                    >
+                        <i class="fas fa-key mr-1"></i>
+                        {% translate "Token Beheer" %}
+                    </button>
+                    <button 
+                        class="data-[state=active]:bg-background data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm text-muted-foreground"
+                        data-tab="accounts"
+                        data-slot="tabs-trigger"
+                        data-state="inactive"
+                        onclick="switchTab('accounts')"
+                    >
+                        <i class="fas fa-link mr-1"></i>
+                        {% translate "Ad Accounts" %}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Token Management Tab Content -->
+            <div id="token-tab" class="tab-content flex-1 outline-none" style="display: block;">
+                <div>
+                    <!-- Token Add/Test Form -->
+                    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm mb-6" data-slot="card">
+                        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                            <div class="leading-none font-semibold" data-slot="card-title">{% translate "Facebook Access Token" %}</div>
+                            <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Voeg een Facebook access token toe om ad accounts te koppelen" %}</div>
+                        </div>
+                        <div class="px-6" data-slot="card-content">
+                            <form id="token-management-form" class="space-y-4">
+                                {% csrf_token %}
+                                
+                                <!-- Token Input -->
+                                <div class="space-y-2">
+                                    <label class="text-sm font-medium">{% translate "Access Token" %}</label>
+                                    <textarea 
+                                        id="access-token-input" 
+                                        class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50" 
+                                        placeholder="{% translate 'Plak hier uw Facebook access token...' %}"
+                                        required
+                                    >{% if user_accounts %}{{ user_accounts.0.access_token }}{% endif %}</textarea>
+                                    <div class="text-xs text-muted-foreground">
+                                        {% if user_accounts %}
+                                            {% blocktranslate trimmed %}
+                                                <strong>Huidige token getoond.</strong> U kunt deze bijwerken door een nieuwe token in te voeren en op "Token Valideren & Accounts Ophalen" te klikken.
+                                            {% endblocktranslate %}
+                                            <br>
+                                        {% endif %}
+                                        {% blocktranslate trimmed %}
+                                            Genereer een token via de <a href="https://developers.facebook.com/tools/explorer/" target="_blank" class="text-primary hover:underline">Facebook Graph API Explorer</a>
+                                        {% endblocktranslate %}
+                                    </div>
+                                </div>
+                                
+                                <!-- Token Validation Results -->
+                                <div id="token-validation-results" class="hidden space-y-2">
+                                    <label class="text-sm font-medium">{% translate "Token Validatie" %}</label>
+                                    <div class="p-3 bg-muted rounded-md">
+                                        <div class="text-sm" id="validation-content"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Action Buttons -->
+                                <div class="flex flex-wrap gap-3">
+                                    <button 
+                                        type="button" 
+                                        onclick="validateToken()"
+                                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                                        data-slot="button"
+                                        id="validate-token-btn"
+                                    >
+                                        <i class="fas fa-check mr-1"></i>
+                                        {% translate "Token Valideren" %}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onclick="fetchAccountsModal()"
+                                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow-xs hover:bg-green-700 h-9 px-4 py-2"
+                                        data-slot="button"
+                                        id="fetch-accounts-btn"
+                                        disabled
+                                    >
+                                        <i class="fas fa-download mr-1"></i>
+                                        {% translate "Accounts Ophalen" %}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onclick="clearTokenForm()"
+                                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                                        data-slot="button"
+                                    >
+                                        <i class="fas fa-eraser mr-1"></i>
+                                        {% translate "Wissen" %}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onclick="window.testAPI()"
+                                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-orange-400 bg-orange-50 text-orange-700 shadow-xs hover:bg-orange-100 h-9 px-4 py-2"
+                                        data-slot="button"
+                                        title="Test API connectivity - check console for details"
+                                    >
+                                        <i class="fas fa-bug mr-1"></i>
+                                        {% translate "Debug API" %}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Info Alert -->
+                    <div class="border-l-4 border-blue-400 bg-blue-50 p-4 rounded-md" data-slot="alert">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                            </div>
+                            <div class="ml-3" data-slot="alert-description">
+                                <h4 class="text-sm font-medium text-blue-900">{% translate "Multi-User Dashboard" %}</h4>
+                                <p class="text-sm text-blue-700 mt-1">
+                                    {% translate "Momenteel ondersteunt het dashboard één gebruiker. In de toekomst kunnen meerdere gebruikers hetzelfde dashboard delen." %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ad Accounts Management Tab Content -->
+            <div id="accounts-tab" class="tab-content flex-1 outline-none" data-slot="tabs-content" style="display: none;">
+                <div>
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold">{% translate "Dashboard Ad Accounts" %}</h3>
+                        <span class="text-sm text-muted-foreground">
+                            {{ user_accounts|length|default:0 }} account{{ user_accounts|length|pluralize }} {% translate "gekoppeld" %}
+                        </span>
+                    </div>
+                    
+                    {% if user_accounts %}
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {% for account in user_accounts %}
+                                <!-- Account Card -->
+                                <div class="bg-card text-card-foreground flex flex-col rounded-xl border shadow-sm" data-slot="card">
+                                    <!-- Card Header -->
+                                    <div class="px-6 pt-6" data-slot="card-header">
+                                        <div class="flex items-start justify-between">
+                                            <h4 class="text-lg font-medium flex items-center gap-2">
+                                                <i class="fab fa-facebook text-blue-600"></i>
+                                                <a href="{% url 'facebook_ads:account_detail' account.id %}" class="hover:underline text-primary font-medium">{{ account.ad_account_name }}</a>
+                                            </h4>
+                                            
+                                            <!-- Status and Refresh Button - Top Right -->
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
+                                                    <i class="fas fa-check-circle mr-1"></i>
+                                                    {% translate "Actief" %}
+                                                </span>
+                                                <button 
+                                                    onclick="refreshAccountStatus('{{ account.id }}')"
+                                                    class="cursor-pointer inline-flex items-center justify-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors p-1 rounded"
+                                                    title="{% translate 'Status vernieuwen' %}"
+                                                >
+                                                    <i class="fas fa-sync-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Card Content - Takes up remaining space -->
+                                    <div class="px-6 flex-1" data-slot="card-content">
+                                        <div class="mt-3 space-y-2">
+                                            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <i class="fas fa-hashtag w-4 flex-shrink-0"></i>
+                                                <span class="font-medium">{% translate "Account ID:" %}</span> 
+                                                <code class="bg-muted px-1 py-0.5 rounded text-xs">{{ account.ad_account_id }}</code>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <i class="fas fa-mobile-alt w-4 flex-shrink-0"></i>
+                                                <span class="font-medium">{% translate "App ID:" %}</span> 
+                                                <code class="bg-muted px-1 py-0.5 rounded text-xs">{{ account.app_id }}</code>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <i class="fas fa-calendar w-4 flex-shrink-0"></i>
+                                                <span class="font-medium">{% translate "Toegevoegd:" %}</span> 
+                                                <span class="text-xs">{{ account.created_at|date:"d M Y H:i" }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <i class="fas fa-user w-4 flex-shrink-0"></i>
+                                                <span class="font-medium">{% translate "Gebruiker:" %}</span> 
+                                                <span class="text-xs">{{ account.user.get_full_name|default:account.user.username }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Card Footer - Only Action Buttons -->
+                                    <div class="px-6 pb-6" data-slot="card-footer">
+                                        <div class="pt-6 border-t mt-4">
+                                            <!-- Actions Row -->
+                                            <div class="flex gap-2">
+                                                <button 
+                                                    onclick="testAccountConnection('{{ account.id }}')"
+                                                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 flex-1"
+                                                    data-slot="button"
+                                                    title="{% translate 'Verbinding testen' %}"
+                                                >
+                                                    <i class="fas fa-link text-xs"></i>
+                                                    {% translate "Test" %}
+                                                </button>
+                                                <button 
+                                                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 h-9 px-3 flex-1 disconnect-account-btn"
+                                                    data-slot="button"
+                                                    data-account-id="{{ account.id }}"
+                                                    data-account-name="{{ account.ad_account_name }}"
+                                                    title="{% translate 'Account ontkoppelen' %}"
+                                                >
+                                                    <i class="fas fa-unlink text-xs"></i>
+                                                    {% translate "Ontkoppelen" %}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <!-- Empty State -->
+                        <div class="text-center py-16">
+                            <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+                                <i class="fab fa-facebook text-4xl text-muted-foreground"></i>
+                            </div>
+                            <h3 class="text-xl font-medium mb-2">{% translate "Geen Ad Accounts Gekoppeld" %}</h3>
+                            <p class="text-muted-foreground mb-6 max-w-md mx-auto">
+                                {% translate "Voeg uw Facebook access token toe om ad accounts aan het dashboard te koppelen en uw campagnes te beheren." %}
+                            </p>
+                            <button 
+                                onclick="switchTab('token')" 
+                                class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
+                                data-slot="button"
+                            >
+                                <i class="fas fa-plus mr-2"></i>
+                                {% translate "Eerste Account Toevoegen" %}
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
 
 <!-- Account Selection Modal -->
 <div id="account-selection-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-  <div class="bg-card text-card-foreground rounded-xl border shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" data-slot="card">
-    <div class="flex flex-col gap-6 py-6" data-slot="card">
-      <!-- Modal Header -->
-      <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
-        <div class="flex items-center justify-between">
-          <div class="leading-none font-semibold text-xl" data-slot="card-title">{% translate "Selecteer Ad Accounts" %}</div>
-          <button onclick="closeAccountSelectionModal()" class="text-muted-foreground hover:text-foreground">
-            <i class="fas fa-times"></i>
-          </button>
+    <div class="bg-card text-card-foreground rounded-xl border shadow-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" data-slot="card">
+        <div class="flex flex-col gap-6 py-6" data-slot="card">
+            <!-- Modal Header -->
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div class="leading-none font-semibold text-xl" data-slot="card-title">{% translate "Selecteer Ad Accounts" %}</div>
+                    <button onclick="closeAccountSelectionModal()" class="text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Kies de ad accounts die u wilt koppelen aan het dashboard" %}</div>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="px-6 flex-1 overflow-y-auto" data-slot="card-content">
+                <div id="modal-accounts-list" class="space-y-3">
+                    <!-- Accounts will be populated here -->
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="flex justify-between items-center px-6 pt-4 border-t">
+                <div class="text-sm text-muted-foreground">
+                    <span id="selected-count">0</span> {% translate "account(s) geselecteerd" %}
+                </div>
+                <div class="flex gap-3">
+                    <button 
+                        onclick="closeAccountSelectionModal()"
+                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                        data-slot="button"
+                    >
+                        {% translate "Annuleren" %}
+                    </button>
+                    <button 
+                        onclick="connectSelectedAccountsFromModal()"
+                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                        data-slot="button"
+                        id="connect-selected-btn"
+                        disabled
+                    >
+                        <i class="fas fa-link mr-1"></i>
+                        {% translate "Geselecteerde Accounts Koppelen" %}
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="text-muted-foreground text-sm" data-slot="card-description">{% translate "Kies de ad accounts die u wilt koppelen aan het dashboard" %}</div>
-      </div>
-      
-      <!-- Modal Content -->
-      <div class="px-6 flex-1 overflow-y-auto" data-slot="card-content">
-        <div id="modal-accounts-list" class="space-y-3">
-          <!-- Accounts will be populated here -->
-        </div>
-      </div>
-      
-      <!-- Modal Footer -->
-      <div class="flex justify-between items-center px-6 pt-4 border-t">
-        <div class="text-sm text-muted-foreground">
-          <span id="selected-count">0</span> {% translate "account(s) geselecteerd" %}
-        </div>
-        <div class="flex gap-3">
-          <button 
-            onclick="closeAccountSelectionModal()"
-            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
-            data-slot="button"
-          >
-            {% translate "Annuleren" %}
-          </button>
-          <button 
-            onclick="connectSelectedAccountsFromModal()"
-            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
-            data-slot="button"
-            id="connect-selected-btn"
-            disabled
-          >
-            <i class="fas fa-link mr-1"></i>
-            {% translate "Geselecteerde Accounts Koppelen" %}
-          </button>
-        </div>
-      </div>
     </div>
-  </div>
 </div>
 
 <!-- Disconnect Confirmation Modal -->
 <div id="disconnect-confirmation-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-  <div class="bg-card text-card-foreground rounded-xl border shadow-lg max-w-md w-full mx-4" data-slot="card">
-    <div class="flex flex-col gap-6 py-6" data-slot="card">
-      <!-- Modal Header -->
-      <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
-        <div class="flex items-center justify-between">
-          <div class="leading-none font-semibold text-xl text-destructive" data-slot="card-title">
-            <i class="fas fa-trash mr-2"></i>
-            {% translate "Account Verwijderen uit Dashboard" %}
-          </div>
-          <button onclick="closeDisconnectModal()" class="text-muted-foreground hover:text-foreground">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Modal Content -->
-      <div class="px-6" data-slot="card-content">
-        <p class="text-muted-foreground">
-          {% translate "Weet u zeker dat u het account" %} "<span id="disconnect-account-name" class="font-medium text-foreground"></span>" {% translate "wilt verwijderen uit het dashboard?" %}
-        </p>
-        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div class="flex items-start gap-2">
-            <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
-            <div class="text-sm text-blue-800">
-              <p class="font-medium">{% translate "Let op:" %}</p>
-              <p>{% translate "Dit account wordt alleen uit het dashboard verwijderd. Uw Facebook account en advertenties blijven ongewijzigd." %}</p>
+    <div class="bg-card text-card-foreground rounded-xl border shadow-lg max-w-md w-full mx-4" data-slot="card">
+        <div class="flex flex-col gap-6 py-6" data-slot="card">
+            <!-- Modal Header -->
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div class="leading-none font-semibold text-xl text-destructive" data-slot="card-title">
+                        <i class="fas fa-trash mr-2"></i>
+                        {% translate "Account Verwijderen uit Dashboard" %}
+                    </div>
+                    <button onclick="closeDisconnectModal()" class="text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
-          </div>
-        </div>
-        <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div class="flex items-start gap-2">
-            <i class="fas fa-lightbulb text-green-600 mt-0.5"></i>
-            <div class="text-sm text-green-800">
-              <p class="font-medium">{% translate "Tip:" %}</p>
-              <p>{% translate "U kunt het account later opnieuw toevoegen door het te koppelen via de Token Beheer tab." %}</p>
+            
+            <!-- Modal Content -->
+            <div class="px-6" data-slot="card-content">
+                <p class="text-muted-foreground">
+                    {% translate "Weet u zeker dat u het account" %} "<span id="disconnect-account-name" class="font-medium text-foreground"></span>" {% translate "wilt verwijderen uit het dashboard?" %}
+                </p>
+                <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div class="text-sm text-blue-800">
+                            <p class="font-medium">{% translate "Let op:" %}</p>
+                            <p>{% translate "Dit account wordt alleen uit het dashboard verwijderd. Uw Facebook account en advertenties blijven ongewijzigd." %}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div class="flex items-start gap-2">
+                        <i class="fas fa-lightbulb text-green-600 mt-0.5"></i>
+                        <div class="text-sm text-green-800">
+                            <p class="font-medium">{% translate "Tip:" %}</p>
+                            <p>{% translate "U kunt het account later opnieuw toevoegen door het te koppelen via de Token Beheer tab." %}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
+            
+            <!-- Modal Footer -->
+            <div class="flex justify-end gap-3 px-6">
+                <button 
+                    onclick="closeDisconnectModal()"
+                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                    data-slot="button"
+                >
+                    {% translate "Annuleren" %}
+                </button>
+                <button 
+                    onclick="confirmDisconnectAccount()"
+                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 h-9 px-4 py-2"
+                    data-slot="button"
+                    id="confirm-disconnect-btn"
+                >
+                    <i class="fas fa-trash mr-1"></i>
+                    {% translate "Ja, Verwijderen" %}
+                </button>
+            </div>
         </div>
-      </div>
-      
-      <!-- Modal Footer -->
-      <div class="flex justify-end gap-3 px-6">
-        <button 
-          onclick="closeDisconnectModal()"
-          class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
-          data-slot="button"
-        >
-          {% translate "Annuleren" %}
-        </button>
-        <button 
-          onclick="confirmDisconnectAccount()"
-          class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 h-9 px-4 py-2"
-          data-slot="button"
-          id="confirm-disconnect-btn"
-        >
-          <i class="fas fa-trash mr-1"></i>
-          {% translate "Ja, Verwijderen" %}
-        </button>
-      </div>
     </div>
-  </div>
 </div>
 
 <!-- Notification Container -->
 <div id="notification-container" class="fixed bottom-4 right-4 z-50 space-y-2">
-  <!-- Notifications will be dynamically added here -->
+    <!-- Notifications will be dynamically added here -->
 </div>
+{% endblock %}
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // Check if user is authenticated
-  const dataElement = document.getElementById('existing-accounts-data');
-  const isAuthenticated = dataElement ? dataElement.dataset.userAuthenticated === 'true' : false;
-  
-  if (!isAuthenticated) {
-    console.log('User is not authenticated - redirecting to login');
-    // Redirect to login page
-    window.location.href = '{% url "account_login" %}';
-    return;
-  }
-  
-  // Initialize with token tab active
-  switchTab('token');
-  
-  // Add event listeners for disconnect buttons
-  document.querySelectorAll('.disconnect-account-btn').forEach(button => {
-    button.addEventListener('click', function() {
-      const accountId = this.getAttribute('data-account-id');
-      const accountName = this.getAttribute('data-account-name');
-      disconnectAccount(accountId, accountName);
-    });
-  });
-});
-
-function switchTab(tabName) {
-  console.log('Switching to tab:', tabName);
-  
-  // Hide all tab contents using display style
-  document.querySelectorAll('.tab-content').forEach(tab => {
-    tab.style.display = 'none';
-  });
-  
-  // Show selected tab
-  const selectedTab = document.getElementById(tabName + '-tab');
-  if (selectedTab) {
-    selectedTab.style.display = 'block';
-    console.log('Showing tab:', selectedTab);
-  } else {
-    console.log('Tab not found:', tabName + '-tab');
-  }
-  
-  // Update tab button states
-  document.querySelectorAll('[data-slot="tabs-trigger"]').forEach(button => {
-    if (button.getAttribute('data-tab') === tabName) {
-      button.setAttribute('data-state', 'active');
-      button.classList.add('bg-background', 'text-foreground', 'shadow-sm');
-      button.classList.remove('text-muted-foreground');
-    } else {
-      button.setAttribute('data-state', 'inactive');
-      button.classList.remove('bg-background', 'text-foreground', 'shadow-sm');
-      button.classList.add('text-muted-foreground');
-    }
-  });
-}
-
-function validateToken() {
-  const tokenInput = document.getElementById('access-token-input');
-  const token = tokenInput.value.trim();
-  
-  if (!token) {
-    showError('Voer eerst een access token in');
-    return;
-  }
-  
-  const validateBtn = document.getElementById('validate-token-btn');
-  const originalText = validateBtn.innerHTML;
-  validateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Valideren...';
-  validateBtn.disabled = true;
-  
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  // Only validate the token
-  fetch('/facebook-ads/api/test-token/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      access_token: token
-    })
-  })
-  .then(response => {
-    console.log('Validate token response status:', response.status);
-    
-    return response.text().then(text => {
-      console.log('Validate token response text:', text);
-      
-      // Try to parse as JSON
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (parseError) {
-        console.error('JSON parse error in validateToken:', parseError);
-        throw new Error(`Server returned invalid JSON: ${text.substring(0, 200)}...`);
-      }
-      
-      // Handle different response statuses
-      if (response.status === 403) {
-        if (data.detail && data.detail.includes('Authentication credentials')) {
-          throw new Error('U bent niet ingelogd. Log opnieuw in en probeer het nogmaals.');
-        } else {
-          throw new Error(`Toegang geweigerd: ${data.detail || 'Onbekende fout'}`);
-        }
-      } else if (response.status === 401) {
-        throw new Error('Uw sessie is verlopen. Log opnieuw in.');
-      } else if (!response.ok) {
-        throw new Error(`Server error (${response.status}): ${data.detail || data.message || 'Onbekende fout'}`);
-      }
-      
-      return data;
-    });
-  })
-  .then(data => {
-    displayValidationResults(data);
-    if (data.success) {
-      // Enable the fetch accounts button
-      document.getElementById('fetch-accounts-btn').disabled = false;
-      showSuccess('Token succesvol gevalideerd!');
-    } else {
-      showError(data.message || 'Token validatie gefaald');
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    displayValidationResults({
-      success: false,
-      message: error.message || 'Er is een fout opgetreden bij het valideren van de token'
-    });
-    showError(error.message || 'Er is een fout opgetreden bij het valideren van de token');
-  })
-  .finally(() => {
-    validateBtn.innerHTML = originalText;
-    validateBtn.disabled = false;
-  });
-}
-
-// Add test button functionality (can be called from browser console)
-window.testAPI = testAPIConnectivity;
-
-// Global function to handle authentication errors
-function handleAuthenticationError(error) {
-  console.log('Authentication error detected:', error.message);
-  
-  if (error.message.includes('niet ingelogd') || 
-      error.message.includes('sessie is verlopen') || 
-      error.message.includes('Authentication credentials') ||
-      error.message.includes('Toegang geweigerd')) {
-    
-    // Show brief message before redirect
-    showError('Sessie verlopen. U wordt doorgestuurd naar de inlogpagina...');
-    
-    // Redirect to login after short delay
-    setTimeout(() => {
-      window.location.href = '{% url "account_login" %}?next=' + encodeURIComponent(window.location.pathname);
-    }, 1500);
-    
-    return true; // Indicates that redirect will happen
-  }
-  
-  return false; // Not an authentication error
-}
-
-// Function to check if user is authenticated
-function checkAuthentication() {
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  return fetch('/facebook-ads/api/test-token/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      access_token: 'dummy_token_for_auth_check'
-    })
-  })
-  .then(response => {
-    if (response.status === 403 || response.status === 401) {
-      return false; // Not authenticated
-    }
-    return true; // Authenticated (even if token is invalid, at least user is logged in)
-  })
-  .catch(() => false);
-}
-
-function fetchAccountsModal() {
-  const tokenInput = document.getElementById('access-token-input');
-  const token = tokenInput.value.trim();
-  
-  if (!token) {
-    showError('Voer eerst een access token in en valideer deze');
-    return;
-  }
-  
-  const fetchBtn = document.getElementById('fetch-accounts-btn');
-  const originalText = fetchBtn.innerHTML;
-  fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Ophalen...';
-  fetchBtn.disabled = true;
-  
-  console.log('Starting account fetch with token length:', token.length);
-  
-  // Check authentication first
-  checkAuthentication()
-  .then(isAuthenticated => {
-    if (!isAuthenticated) {
-      throw new Error('U bent niet ingelogd. Log eerst in voordat u accounts kunt ophalen.');
-    }
-    
-    // Fetch ad accounts and show in modal
-    return fetchAdAccountsForToken(token);
-  })
-  .then(accountsData => {
-    console.log('Received accounts data:', accountsData);
-    
-    if (accountsData && accountsData.success) {
-      showAccountSelectionModal(accountsData.accounts, token);
-      showInfo(`${accountsData.accounts.length} accounts gevonden`);
-    } else {
-      const errorMsg = accountsData?.message || 'Onbekende fout bij ophalen accounts';
-      console.error('API returned error:', errorMsg);
-      throw new Error(errorMsg);
-    }
-  })
-  .catch(error => {
-    console.error('Error in fetchAccountsModal:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    showError('Er is een fout opgetreden bij het ophalen van accounts: ' + error.message);
-  })
-  .finally(() => {
-    fetchBtn.innerHTML = originalText;
-    fetchBtn.disabled = false;
-  });
-}
-
-function displayValidationResults(data) {
-  const resultsDiv = document.getElementById('token-validation-results');
-  const contentDiv = document.getElementById('validation-content');
-  
-  resultsDiv.classList.remove('hidden');
-  
-  if (data.success) {
-    contentDiv.innerHTML = `
-      <div class="flex items-center gap-2 mb-2">
-        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
-          <i class="fas fa-check-circle mr-1"></i>Token Geldig
-        </span>
-      </div>
-      <div class="space-y-1">
-        <div><span class="font-medium">App:</span> ${data.app_name || 'Onbekend'}</div>
-        <div><span class="font-medium">App ID:</span> ${data.app_id || 'Onbekend'}</div>
-        <div><span class="font-medium">Scopes:</span> ${data.permissions ? data.permissions.join(', ') : 'Geen'}</div>
-        <div><span class="font-medium">Gebruiker:</span> ${data.user_name || 'Onbekend'}</div>
-        <div><span class="font-medium">Geldig tot:</span> ${data.expires_at || 'Onbekend'}</div>
-      </div>
-    `;
-  } else {
-    contentDiv.innerHTML = `
-      <div class="flex items-center gap-2 mb-2">
-        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800" data-slot="badge">
-          <i class="fas fa-exclamation-triangle mr-1"></i>Token Ongeldig
-        </span>
-      </div>
-      <div class="text-red-700">
-        <span class="font-medium">Fout:</span> ${data.message}
-      </div>
-    `;
-  }
-}
-
-function fetchAdAccountsForToken(token) {
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  console.log('=== FETCH ACCOUNTS DEBUG ===');
-  console.log('CSRF Token found:', csrfToken ? 'Yes' : 'No');
-  console.log('CSRF Token length:', csrfToken.length);
-  console.log('Token length:', token.length);
-  console.log('Making request to:', '/facebook-ads/api/fetch-accounts/');
-  
-  if (!csrfToken) {
-    throw new Error('CSRF token niet gevonden. Herlaad de pagina en probeer opnieuw.');
-  }
-  
-  return fetch('/facebook-ads/api/fetch-accounts/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      access_token: token
-    })
-  })
-  .then(response => {
-    console.log('=== RESPONSE DEBUG ===');
-    console.log('Response status:', response.status);
-    console.log('Response statusText:', response.statusText);
-    console.log('Response headers:', response.headers);
-    console.log('Response ok:', response.ok);
-    console.log('Response type:', response.type);
-    console.log('Response url:', response.url);
-    
-    // Get response text first to handle both success and error cases
-    return response.text().then(text => {
-      console.log('=== RAW RESPONSE TEXT ===');
-      console.log('Response text length:', text.length);
-      console.log('Response text (first 500 chars):', text.substring(0, 500));
-      console.log('Response text (last 100 chars):', text.substring(Math.max(0, text.length - 100)));
-      
-      // Check if response is empty
-      if (!text || text.trim() === '') {
-        console.error('Empty response received');
-        throw new Error('Server returned empty response');
-      }
-      
-      // Try to parse as JSON
-      let data;
-      try {
-        data = JSON.parse(text);
-        console.log('=== PARSED JSON ===');
-        console.log('Parsed JSON:', data);
-      } catch (parseError) {
-        console.error('=== JSON PARSE ERROR ===');
-        console.error('Parse error:', parseError);
-        console.error('Raw text that failed to parse:', text);
-        
-        // Check if it looks like HTML (Django error page)
-        if (text.trim().startsWith('<') || text.includes('<!DOCTYPE') || text.includes('<html')) {
-          throw new Error('Server returned HTML instead of JSON. Check Django logs for errors.');
-        } else {
-          throw new Error(`Server returned invalid JSON: ${text.substring(0, 200)}...`);
-        }
-      }
-      
-      // Handle different response statuses
-      if (response.status === 403) {
-        console.error('403 Forbidden response:', data);
-        if (data.detail && data.detail.includes('Authentication credentials')) {
-          throw new Error('U bent niet ingelogd. Log opnieuw in en probeer het nogmaals.');
-        } else if (data.detail && data.detail.includes('CSRF')) {
-          throw new Error('CSRF token probleem. Herlaad de pagina en probeer opnieuw.');
-        } else {
-          throw new Error(`Toegang geweigerd: ${data.detail || 'Onbekende fout'}`);
-        }
-      } else if (response.status === 401) {
-        console.error('401 Unauthorized response:', data);
-        throw new Error('Uw sessie is verlopen. Log opnieuw in.');
-      } else if (response.status === 500) {
-        console.error('500 Server Error response:', data);
-        throw new Error(`Server fout: ${data.detail || data.message || 'Interne server fout'}`);
-      } else if (!response.ok) {
-        console.error(`${response.status} response:`, data);
-        throw new Error(`Server error (${response.status}): ${data.detail || data.message || 'Onbekende fout'}`);
-      }
-      
-      // Check if we got the expected data structure
-      if (!data.hasOwnProperty('success')) {
-        console.warn('Response missing success field:', data);
-      }
-      
-      return data;
-    });
-  })
-  .catch(error => {
-    console.error('=== FETCH ERROR ===');
-    console.error('Fetch error details:', error);
-    console.error('Error type:', typeof error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    // Re-throw with more context
-    if (error.message && error.message.includes('Failed to fetch')) {
-      throw new Error('Kan geen verbinding maken met de server. Controleer of de server draait.');
-    } else if (error.message && error.message.includes('NetworkError')) {
-      throw new Error('Netwerk fout. Controleer uw internetverbinding.');
-    }
-    throw error;
-  });
-}
-
-function showAccountSelectionModal(accounts, token) {
-  console.log('=== SHOW ACCOUNT SELECTION MODAL ===');
-  console.log('Accounts received:', accounts);
-  console.log('Token received:', token);
-  
-  const modal = document.getElementById('account-selection-modal');
-  const accountsList = document.getElementById('modal-accounts-list');
-  
-  // Store token for later use
-  modal.dataset.token = token;
-  
-  // Get existing account IDs from data attribute
-  const dataElement = document.getElementById('existing-accounts-data');
-  let existingAccountIds = [];
-  
-  console.log('=== EXISTING ACCOUNTS DATA DEBUG ===');
-  console.log('Data element found:', dataElement ? 'Yes' : 'No');
-  if (dataElement) {
-    console.log('Data element:', dataElement);
-    console.log('Dataset:', dataElement.dataset);
-    console.log('Account IDs attribute:', dataElement.dataset.accountIds);
-  }
-  
-  if (dataElement && dataElement.dataset.accountIds) {
-    try {
-      const accountIdsData = dataElement.dataset.accountIds;
-      console.log('Raw account IDs data:', accountIdsData);
-      console.log('Type of raw data:', typeof accountIdsData);
-      
-      // Handle both string and already parsed data
-      if (typeof accountIdsData === 'string') {
-        existingAccountIds = JSON.parse(accountIdsData);
-      } else {
-        existingAccountIds = accountIdsData;
-      }
-      
-      console.log('Parsed existing account IDs:', existingAccountIds);
-      console.log('Type of parsed data:', typeof existingAccountIds);
-      console.log('Is array:', Array.isArray(existingAccountIds));
-    } catch (parseError) {
-      console.error('Error parsing existing account IDs:', parseError);
-      console.error('Raw data that failed to parse:', dataElement.dataset.accountIds);
-      existingAccountIds = [];
-    }
-  } else {
-    console.log('No existing account IDs data found - using empty array');
-  }
-  
-  if (accounts && accounts.length > 0) {
-    console.log('Creating account list HTML for', accounts.length, 'accounts');
-    console.log('Existing account IDs to check against:', existingAccountIds);
-    
-    accountsList.innerHTML = accounts.map((account, index) => {
-      console.log(`\n--- Processing Account ${index + 1} ---`);
-      console.log('Account object:', account);
-      console.log('Account ID from API:', account.id);
-      console.log('Account ID type:', typeof account.id);
-      
-      // Check if this account is already connected
-      // Note: Facebook API returns account IDs without 'act_' prefix in the id field,
-      // but sometimes with 'act_' prefix. We need to check both variations.
-      const accountIdWithoutPrefix = account.id.toString().replace('act_', '');
-      const accountIdWithPrefix = account.id.toString().startsWith('act_') ? account.id : `act_${account.id}`;
-      
-      console.log('Account ID variations to check:');
-      console.log('- Original:', account.id);
-      console.log('- Without prefix:', accountIdWithoutPrefix);
-      console.log('- With prefix:', accountIdWithPrefix);
-      console.log('- As string:', account.id.toString());
-      
-      // Check all possible matches
-      const matchOriginal = existingAccountIds.includes(account.id.toString());
-      const matchWithoutPrefix = existingAccountIds.includes(accountIdWithoutPrefix);
-      const matchWithPrefix = existingAccountIds.includes(accountIdWithPrefix);
-      
-      console.log('Match results:');
-      console.log('- Original match:', matchOriginal);
-      console.log('- Without prefix match:', matchWithoutPrefix);
-      console.log('- With prefix match:', matchWithPrefix);
-      
-      const isExisting = matchOriginal || matchWithoutPrefix || matchWithPrefix;
-      
-      console.log(`Final result: Account ${account.name} (ID: ${account.id}) - Is existing: ${isExisting}`);
-      
-      if (isExisting) {
-        // Existing account - disabled styling
-        return `
-          <div class="flex items-center gap-3 p-4 border rounded-lg bg-gray-50 opacity-70 cursor-not-allowed">
-            <div class="relative">
-              <div class="w-5 h-5 bg-green-100 border-2 border-green-500 rounded flex items-center justify-center">
-                <i class="fas fa-check text-green-600 text-xs"></i>
-              </div>
-            </div>
-            <div class="flex-1">
-              <div class="font-medium flex items-center gap-2 text-gray-600">
-                ${account.name}
-                <i class="fas fa-link text-xs text-green-600" title="Al gekoppeld aan dit dashboard"></i>
-                <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Al gekoppeld</span>
-              </div>
-              <div class="text-sm text-gray-400">Account ID: ${account.id}</div>
-              ${account.account_status ? `<div class="text-xs text-gray-400">Status: ${account.account_status}</div>` : ''}
-            </div>
-          </div>
-        `;
-      } else {
-        // New account - selectable styling
-        return `
-          <label class="flex items-center gap-3 p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-colors">
-            <div class="relative">
-              <input type="checkbox" name="modal-selected-accounts" value="${account.id}" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" onchange="updateModalSelectedCount()">
-            </div>
-            <div class="flex-1">
-              <div class="font-medium flex items-center gap-2 text-gray-900">
-                ${account.name}
-                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">Beschikbaar</span>
-              </div>
-              <div class="text-sm text-gray-600">Account ID: ${account.id}</div>
-              ${account.account_status ? `<div class="text-xs text-green-600">Status: ${account.account_status}</div>` : ''}
-            </div>
-          </label>
-        `;
-      }
-    }).join('');
-    
-    console.log('Account list HTML created successfully');
-  } else {
-    console.log('No accounts to display');
-    accountsList.innerHTML = '<p class="text-muted-foreground text-center py-8">Geen ad accounts gevonden voor deze token</p>';
-  }
-  
-  // Reset selection count
-  updateModalSelectedCount();
-  
-  // Update modal header with account counts
-  const totalAccounts = accounts ? accounts.length : 0;
-  const existingCount = accounts ? accounts.filter(account => {
-    const accountIdWithoutPrefix = account.id.toString().replace('act_', '');
-    const accountIdWithPrefix = account.id.toString().startsWith('act_') ? account.id : `act_${account.id}`;
-    return existingAccountIds.includes(accountIdWithoutPrefix) || 
-           existingAccountIds.includes(accountIdWithPrefix) ||
-           existingAccountIds.includes(account.id.toString());
-  }).length : 0;
-  const availableCount = totalAccounts - existingCount;
-  
-  // Update modal description
-  const modalDescription = document.querySelector('#account-selection-modal [data-slot="card-description"]');
-  if (modalDescription) {
-    modalDescription.textContent = `${totalAccounts} account(s) gevonden: ${availableCount} beschikbaar, ${existingCount} al gekoppeld`;
-  }
-  
-  // Show modal
-  modal.classList.remove('hidden');
-  console.log('Modal shown');
-  console.log(`Totaal: ${totalAccounts}, Beschikbaar: ${availableCount}, Al gekoppeld: ${existingCount}`);
-}
-
-function closeAccountSelectionModal() {
-  const modal = document.getElementById('account-selection-modal');
-  modal.classList.add('hidden');
-  
-  // Clear stored token
-  delete modal.dataset.token;
-}
-
-function updateModalSelectedCount() {
-  const selectedCheckboxes = document.querySelectorAll('input[name="modal-selected-accounts"]:checked');
-  const countSpan = document.getElementById('selected-count');
-  const connectBtn = document.getElementById('connect-selected-btn');
-  
-  const selectedCount = selectedCheckboxes.length;
-  countSpan.textContent = selectedCount;
-  connectBtn.disabled = selectedCount === 0;
-  
-  // Update button text based on selection
-  const buttonIcon = '<i class="fas fa-link mr-1"></i>';
-  if (selectedCount === 0) {
-    connectBtn.innerHTML = `${buttonIcon}Selecteer Accounts om te Koppelen`;
-  } else if (selectedCount === 1) {
-    connectBtn.innerHTML = `${buttonIcon}1 Account Koppelen`;
-  } else {
-    connectBtn.innerHTML = `${buttonIcon}${selectedCount} Accounts Koppelen`;
-  }
-}
-
-function connectSelectedAccountsFromModal() {
-  const modal = document.getElementById('account-selection-modal');
-  const selectedCheckboxes = document.querySelectorAll('input[name="modal-selected-accounts"]:checked');
-  const token = modal.dataset.token;
-  
-  if (selectedCheckboxes.length === 0) {
-    showError('Selecteer minimaal één ad account om te koppelen');
-    return;
-  }
-  
-  const connectBtn = document.getElementById('connect-selected-btn');
-  const originalText = connectBtn.innerHTML;
-  connectBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Koppelen...';
-  connectBtn.disabled = true;
-  
-  const selectedAccountIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  // Connect each selected account
-  Promise.all(selectedAccountIds.map(accountId => {
-    return fetch('/facebook-ads/api/connect-account/', {
-      method: 'POST',
-      headers: {
-        'X-CSRFToken': csrfToken,
-        'Content-Type': 'application/json',
-      },
-      credentials: 'same-origin',
-      body: JSON.stringify({
-        access_token: token,
-        account_id: accountId
-      })
-    }).then(response => response.json());
-  }))
-  .then(results => {
-    const successful = results.filter(r => r.success).length;
-    const failed = results.length - successful;
-    const totalAttempted = results.length;
-    
-    if (successful > 0) {
-      if (totalAttempted === 1) {
-        const result = results[0];
-        // Show notification popup for single account
-        showSuccess(result.message || 'Account succesvol gekoppeld!');
-      } else {
-        // Show notification popup for multiple accounts
-        showSuccess(`${successful} account(s) succesvol gekoppeld!${failed > 0 ? ` ${failed} account(s) gefaald.` : ''}`);
-      }
-      closeAccountSelectionModal();
-      clearTokenForm();
-      
-      // Dynamically refresh accounts list instead of page reload
-      setTimeout(() => {
-        refreshAccountsList();
-      }, 1500); // Give time for user to see notification
-    } else {
-      if (totalAttempted === 1) {
-        const result = results[0];
-        const errorMessage = result.message || 'Account koppelen mislukt';
-        showError(`Koppelen van account mislukt: ${errorMessage}`);
-      } else {
-        // Show individual error messages for failed accounts
-        const errorMessages = results
-          .filter(r => !r.success)
-          .map(r => r.message || 'Onbekende fout')
-          .join(', ');
-        showError(`Koppelen van ${totalAttempted} account(s) mislukt: ${errorMessages}`);
-      }
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    showError('Er is een fout opgetreden bij het koppelen van accounts');
-  })
-  .finally(() => {
-    connectBtn.innerHTML = originalText;
-    connectBtn.disabled = false;
-  });
-}
-
-function clearTokenForm() {
-  document.getElementById('access-token-input').value = '';
-  document.getElementById('token-validation-results').classList.add('hidden');
-  document.getElementById('fetch-accounts-btn').disabled = true;
-}
-
-function refreshAccountStatus(accountId) {
-  // Add a simple visual feedback
-  const refreshBtn = event.target.closest('button');
-  const originalHtml = refreshBtn.innerHTML;
-  refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Laden...';
-  refreshBtn.disabled = true;
-  
-  // Simulate a refresh - in real implementation, this would call an API
-  setTimeout(() => {
-    refreshBtn.innerHTML = originalHtml;
-    refreshBtn.disabled = false;
-    
-    // Show temporary success message
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded shadow-lg z-50';
-    notification.innerHTML = '<i class="fas fa-check mr-2"></i>Account status ververst';
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      if (document.body.contains(notification)) {
-        document.body.removeChild(notification);
-      }
-    }, 3000);
-  }, 1000);
-}
-
-function testAccountConnection(accountId) {
-  const testBtn = event.target.closest('button');
-  const originalHtml = testBtn.innerHTML;
-  testBtn.innerHTML = '<i class="fas fa-spinner fa-spin text-xs"></i> Test...';
-  testBtn.disabled = true;
-  
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  fetch('/facebook-ads/api/test-account-connection/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      account_id: accountId
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showSuccess('Verbinding met account succesvol getest!');
-    } else {
-      showError(`Verbinding test gefaald: ${data.message}`);
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    showError('Er is een fout opgetreden bij het testen van de verbinding');
-  })
-  .finally(() => {
-    testBtn.innerHTML = originalHtml;
-    testBtn.disabled = false;
-  });
-}
-
-function disconnectAccount(accountId, accountName) {
-  // Store the account info for the modal
-  window.pendingDisconnect = {
-    accountId: accountId,
-    accountName: accountName
-  };
-  
-  // Update modal content
-  document.getElementById('disconnect-account-name').textContent = accountName;
-  
-  // Show the modal
-  document.getElementById('disconnect-confirmation-modal').classList.remove('hidden');
-}
-
-function closeDisconnectModal() {
-  document.getElementById('disconnect-confirmation-modal').classList.add('hidden');
-  
-  // Clear pending disconnect
-  delete window.pendingDisconnect;
-}
-
-function confirmDisconnectAccount() {
-  if (!window.pendingDisconnect) {
-    showError('Geen account geselecteerd om te ontkoppelen');
-    return;
-  }
-  
-  const { accountId, accountName } = window.pendingDisconnect;
-  const confirmBtn = document.getElementById('confirm-disconnect-btn');
-  const originalText = confirmBtn.innerHTML;
-  
-  // Show loading state
-  confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Ontkoppelen...';
-  confirmBtn.disabled = true;
-  
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  fetch(`/facebook-ads/api/disconnect-account/`, {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      account_id: accountId
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      showSuccess('Account succesvol ontkoppeld!');
-      closeDisconnectModal();
-      // Dynamically refresh accounts list
-      setTimeout(() => {
-        refreshAccountsList();
-      }, 1000);
-    } else {
-      showError(`Error: ${data.message}`);
-    }
-  })
-  .catch(error => {
-    console.error('Error:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    showError('Er is een fout opgetreden bij het ontkoppelen van het account.');
-  })
-  .finally(() => {
-    confirmBtn.innerHTML = originalText;
-    confirmBtn.disabled = false;
-  });
-}
-
-// Dynamic refresh function for accounts list
-function refreshAccountsList() {
-  // Show loading indicator
-  const accountsContainer = document.querySelector('#accounts-tab .grid');
-  const accountsCountSpan = document.querySelector('#accounts-tab h3 + span');
-  
-  if (accountsContainer) {
-    accountsContainer.innerHTML = '<div class="col-span-full text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-muted-foreground"></i><p class="mt-2 text-muted-foreground">Accounts bijwerken...</p></div>';
-  }
-  
-  // Fetch fresh account data
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  fetch(window.location.href, {
-    method: 'GET',
-    headers: {
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    credentials: 'same-origin'
-  })
-  .then(response => response.text())
-  .then(html => {
-    // Parse the response HTML
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    // Extract the new accounts section
-    const newAccountsContainer = doc.querySelector('#accounts-tab .grid');
-    const newAccountsCount = doc.querySelector('#accounts-tab h3 + span');
-    const newExistingAccountsData = doc.querySelector('#existing-accounts-data');
-    
-    if (newAccountsContainer && accountsContainer) {
-      // Update accounts list
-      accountsContainer.innerHTML = newAccountsContainer.innerHTML;
-      
-      // Update accounts count
-      if (newAccountsCount && accountsCountSpan) {
-        accountsCountSpan.textContent = newAccountsCount.textContent;
-      }
-      
-      // Update existing accounts data for modal functionality
-      if (newExistingAccountsData) {
-        const existingDataElement = document.getElementById('existing-accounts-data');
-        if (existingDataElement) {
-          existingDataElement.dataset.accountIds = newExistingAccountsData.dataset.accountIds;
-        }
-      }
-      
-      // Re-attach event listeners for disconnect buttons
-      document.querySelectorAll('.disconnect-account-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const accountId = this.getAttribute('data-account-id');
-          const accountName = this.getAttribute('data-account-name');
-          disconnectAccount(accountId, accountName);
-        });
-      });
-      
-      // Check if we need to show empty state or grid
-      const accountCards = accountsContainer.querySelectorAll('[data-slot="card"]');
-      if (accountCards.length === 0) {
-        // Show empty state
-        accountsContainer.innerHTML = `
-          <div class="col-span-full text-center py-16">
-            <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
-              <i class="fab fa-facebook text-4xl text-muted-foreground"></i>
-            </div>
-            <h3 class="text-xl font-medium mb-2">Geen Ad Accounts Gekoppeld</h3>
-            <p class="text-muted-foreground mb-6 max-w-md mx-auto">
-              Voeg uw Facebook access token toe om ad accounts aan het dashboard te koppelen en uw campagnes te beheren.
-            </p>
-            <button 
-              onclick="switchTab('token')" 
-              class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
-              data-slot="button"
-            >
-              <i class="fas fa-plus mr-2"></i>
-              Eerste Account Toevoegen
-            </button>
-          </div>
-        `;
-      }
-    }
-  })
-  .catch(error => {
-    console.error('Error refreshing accounts list:', error);
-    showError('Fout bij het bijwerken van de accounts lijst');
-    
-    // Restore original content on error
-    if (accountsContainer) {
-      setTimeout(() => {
-        location.reload(); // Fallback to page reload on error
-      }, 2000);
-    }
-  });
-}
-
-// Notification functions
-function showNotification(message, type = 'error', duration = 5000) {
-  const container = document.getElementById('notification-container');
-  const notificationId = 'notification-' + Date.now();
-  
-  const typeClasses = {
-    'error': 'bg-red-50 border-red-200 text-red-800',
-    'success': 'bg-green-50 border-green-200 text-green-800',
-    'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    'info': 'bg-blue-50 border-blue-200 text-blue-800'
-  };
-  
-  const iconClasses = {
-    'error': 'fas fa-exclamation-circle text-red-500',
-    'success': 'fas fa-check-circle text-green-500',
-    'warning': 'fas fa-exclamation-triangle text-yellow-500',
-    'info': 'fas fa-info-circle text-blue-500'
-  };
-  
-  const notification = document.createElement('div');
-  notification.id = notificationId;
-  notification.className = `${typeClasses[type]} border rounded-lg p-4 shadow-lg max-w-sm transition-all duration-300 transform translate-x-full opacity-0`;
-  notification.innerHTML = `
-    <div class="flex items-start gap-3">
-      <i class="${iconClasses[type]} mt-0.5"></i>
-      <div class="flex-1">
-        <p class="text-sm font-medium">${message}</p>
-      </div>
-      <button onclick="removeNotification('${notificationId}')" class="text-gray-400 hover:text-gray-600">
-        <i class="fas fa-times text-xs"></i>
-      </button>
-    </div>
-  `;
-  
-  container.appendChild(notification);
-  
-  // Trigger animation after adding to DOM
-  setTimeout(() => {
-    notification.classList.remove('translate-x-full', 'opacity-0');
-    notification.classList.add('translate-x-0', 'opacity-100');
-  }, 10);
-  
-  // Auto-remove after duration
-  if (duration > 0) {
-    setTimeout(() => {
-      removeNotification(notificationId);
-    }, duration);
-  }
-}
-
-function removeNotification(notificationId) {
-  const notification = document.getElementById(notificationId);
-  if (notification) {
-    notification.style.opacity = '0';
-    notification.style.transform = 'translateX(100%)';
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.parentNode.removeChild(notification);
-      }
-    }, 300);
-  }
-}
-
-function showError(message) {
-  showNotification(message, 'error');
-}
-
-function showSuccess(message) {
-  showNotification(message, 'success');
-}
-
-function showWarning(message) {
-  showNotification(message, 'warning');
-}
-
-function showInfo(message) {
-  showNotification(message, 'info');
-}
-
-// Test function to check API connectivity
-function testAPIConnectivity() {
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-  
-  console.log('Testing API connectivity...');
-  
-  fetch('/facebook-ads/api/test-token/', {
-    method: 'POST',
-    headers: {
-      'X-CSRFToken': csrfToken,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      access_token: 'test'
-    })
-  })
-  .then(response => {
-    console.log('Test API response status:', response.status);
-    return response.text();
-  })
-  .then(text => {
-    console.log('Test API response text:', text);
-    showInfo('API connectivity test completed - check console for details');
-  })
-  .catch(error => {
-    console.error('API connectivity test failed:', error);
-    
-    // Check if it's an authentication error and handle redirect
-    if (handleAuthenticationError(error)) {
-      return; // Redirect will happen, don't show additional errors
-    }
-    
-    showError('API connectivity test failed: ' + error.message);
-  });
-}
-</script>
+{% block page_js %}
+<!-- Load modular JavaScript components via Vite -->
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% vite_asset 'assets/javascript/facebook-settings.js' %}
 {% endblock %} 

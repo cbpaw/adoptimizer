@@ -1,6 +1,7 @@
 {% extends "web/app/app_base.html" %}
 {% load static %}
 {% load tz %}
+{% load django_vite %}
 
 {% block title %}Campagnes - Facebook Ads{% endblock %}
 
@@ -96,6 +97,7 @@
                                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Status</th>
                                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Laatst gesynchroniseerd</th>
                                             <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Startdatum</th>
+                                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Acties</th>
                                         </tr>
                                     </thead>
                                     <tbody class="[&_tr:last-child]:border-0" data-slot="table-body">
@@ -109,8 +111,8 @@
                                                            {% if campaign.id in selected_campaign_ids %}checked{% endif %}>
                                                 </td>
                                                 <td class="p-4 align-middle" data-slot="table-cell">
-                                                    <div class="font-medium">{{ campaign.campaign_name }}</div>
-                                                    <div class="text-sm text-muted-foreground">ID: {{ campaign.campaign_id }}</div>
+                                                    <div class="font-medium text-gray-900">{{ campaign.campaign_name }}</div>
+                                                    <div class="text-xs text-gray-500">ID: {{ campaign.campaign_id }}</div>
                                                 </td>
                                                 <td class="p-4 align-middle" data-slot="table-cell">
                                                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
@@ -124,7 +126,13 @@
                                                     {% endif %}
                                                 </td>
                                                 <td class="p-4 align-middle" data-slot="table-cell">
-                                                    <div class="text-sm">{{ campaign.last_synced|localtime|date:"d-m-Y H:i" }}</div>
+                                                    <div class="text-sm">
+                                                        {% if campaign.last_synced %}
+                                                            {{ campaign.last_synced|localtime|date:"d-m-Y H:i" }}
+                                                        {% else %}
+                                                            Niet gesynchroniseerd
+                                                        {% endif %}
+                                                    </div>
                                                 </td>
                                                 <td class="p-4 align-middle" data-slot="table-cell">
                                                     {% if campaign.start_time %}
@@ -133,6 +141,14 @@
                                                         <span class="text-muted-foreground">-</span>
                                                     {% endif %}
                                                 </td>
+                                                <td class="p-4 align-middle" data-slot="table-cell">
+                                                    <a href="{% url 'facebook_ads:campaign_detail' campaign.id %}" 
+                                                       class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 px-3 py-1" 
+                                                       data-slot="button">
+                                                        <i class="fas fa-chart-line mr-1"></i>
+                                                        Details
+                                                    </a>
+                                                </td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
@@ -140,10 +156,31 @@
                             </div>
                         {% else %}
                             <!-- No campaigns for this account -->
-                            <div class="text-center py-12">
+                            <div class="text-center py-12" id="empty-state-{{ account_data.account.id }}">
                                 <i class="fas fa-bullhorn text-muted-foreground text-4xl mb-4"></i>
                                 <h3 class="text-lg font-medium mb-2">Geen campagnes gevonden</h3>
-                                <p class="text-muted-foreground mb-4">Voor dit account zijn nog geen campagnes opgehaald.</p>
+                                <div class="text-description-{{ account_data.account.id }} mb-4">
+                                    <p class="text-muted-foreground main-text-{{ account_data.account.id }}">Voor dit account zijn nog geen campagnes opgehaald.</p>
+                                </div>
+                                <div class="sync-info-{{ account_data.account.id }} hidden">
+                                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 max-w-md mx-auto">
+                                        <div class="flex items-start gap-3">
+                                            <i class="fas fa-exclamation-triangle text-yellow-600 mt-1"></i>
+                                            <div class="text-left">
+                                                <p class="text-sm font-medium text-yellow-800 mb-1">Synchronisatie voltooid</p>
+                                                <p class="text-xs text-yellow-700 mb-2">Er zijn geen campagnes gevonden voor dit account. Dit kan betekenen:</p>
+                                                <ul class="text-xs text-yellow-700 list-disc list-inside space-y-1 mb-2">
+                                                    <li>Het account heeft geen actieve campagnes</li>
+                                                    <li>De campagnes zijn mogelijk gepauzeerd of gestopt</li>
+                                                    <li>Er zijn toegangsproblemen met het account</li>
+                                                </ul>
+                                                <p class="text-xs text-yellow-600 font-medium">
+                                                    Laatste poging: <span class="last-sync-time-{{ account_data.account.id }}">Nog niet gesynchroniseerd</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         {% endif %}
                     </div>
@@ -171,416 +208,11 @@
         </div>
     {% endif %}
 </div>
+{% endblock %}
 
-<!-- Notification Container -->
-<div id="notification-container" class="fixed bottom-4 right-4 z-50 space-y-2">
-  <!-- Notifications will be dynamically added here -->
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // CSRF token
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                     document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-
-    // Tab switching functionality
-    function switchAccountTab(accountId) {
-        // Hide all tab contents
-        document.querySelectorAll('.account-tab-content').forEach(content => {
-            content.classList.add('hidden');
-        });
-        
-        // Show selected tab content
-        const selectedContent = document.getElementById(`account-tab-${accountId}`);
-        if (selectedContent) {
-            selectedContent.classList.remove('hidden');
-        }
-        
-        // Update tab button states
-        document.querySelectorAll('.account-tab').forEach(tab => {
-            if (tab.dataset.accountId === accountId) {
-                tab.classList.remove('border-transparent', 'text-muted-foreground');
-                tab.classList.add('border-primary', 'text-foreground');
-            } else {
-                tab.classList.remove('border-primary', 'text-foreground');
-                tab.classList.add('border-transparent', 'text-muted-foreground');
-            }
-        });
-    }
-
-    // Make switchAccountTab globally available
-    window.switchAccountTab = switchAccountTab;
-
-    // Update selected count for each account
-    function updateSelectedCount(accountId) {
-        const checkboxes = document.querySelectorAll(`.campaign-checkbox[data-account-id="${accountId}"]`);
-        const checkedBoxes = document.querySelectorAll(`.campaign-checkbox[data-account-id="${accountId}"]:checked`);
-        const count = checkedBoxes.length;
-        
-        const selectedCountElement = document.querySelector(`.selected-count[data-account-id="${accountId}"]`);
-        const saveBtn = document.querySelector(`.save-selection-btn[data-account-id="${accountId}"]`);
-        const selectAllCheckbox = document.querySelector(`.select-all-checkbox[data-account-id="${accountId}"]`);
-        
-        if (selectedCountElement) {
-            selectedCountElement.textContent = `${count} geselecteerd`;
-        }
-        
-        if (saveBtn) {
-            saveBtn.disabled = count === 0;
-        }
-        
-        // Update select all checkbox state
-        if (selectAllCheckbox) {
-            selectAllCheckbox.indeterminate = count > 0 && count < checkboxes.length;
-            selectAllCheckbox.checked = count === checkboxes.length && count > 0;
-        }
-    }
-
-    // Handle select all checkboxes
-    document.querySelectorAll('.select-all-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const accountId = this.dataset.accountId;
-            const campaignCheckboxes = document.querySelectorAll(`.campaign-checkbox[data-account-id="${accountId}"]`);
-            
-            campaignCheckboxes.forEach(campaignCheckbox => {
-                campaignCheckbox.checked = this.checked;
-            });
-            
-            updateSelectedCount(accountId);
-        });
-    });
-
-    // Handle individual campaign checkboxes
-    document.querySelectorAll('.campaign-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const accountId = this.dataset.accountId;
-            updateSelectedCount(accountId);
-        });
-    });
-
-    // Handle save selection buttons
-    document.querySelectorAll('.save-selection-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const accountId = this.dataset.accountId;
-            const selectedIds = Array.from(document.querySelectorAll(`.campaign-checkbox[data-account-id="${accountId}"]:checked`))
-                .map(checkbox => parseInt(checkbox.value));
-
-            if (selectedIds.length === 0) {
-                showError('Selecteer ten minste één campagne.');
-                return;
-            }
-
-            // Show loading state
-            this.disabled = true;
-            this.innerHTML = '<span class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>Opslaan...';
-
-            fetch('/facebook-ads/api/save-selected-campaigns/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    campaign_ids: selectedIds
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message
-                    showSuccess(`${data.selected_count} campagne(s) succesvol toegevoegd voor monitoring!`);
-                    
-                    // Redirect to dashboard after short delay
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 2000);
-                } else {
-                    showError('Fout: ' + data.message);
-                    // Reset button
-                    this.disabled = false;
-                    this.innerHTML = '<i class="fas fa-save"></i>Opslaan';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showError('Er is een fout opgetreden bij het opslaan van de selectie.');
-                // Reset button
-                this.disabled = false;
-                this.innerHTML = '<i class="fas fa-save"></i>Opslaan';
-            });
-        });
-    });
-
-    // Handle sync campaigns per account
-    document.querySelectorAll('.sync-account-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const accountId = this.dataset.accountId;
-            
-            // Show loading state
-            this.disabled = true;
-            this.innerHTML = '<span class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></span>Synchroniseren...';
-
-            fetch('/facebook-ads/api/fetch-campaigns-for-account/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    account_id: accountId
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSuccess(`${data.campaigns_synced} campagne(s) succesvol gesynchroniseerd voor ${data.account_name}!`);
-                    
-                    // Refresh campaign data dynamically
-                    setTimeout(() => {
-                        refreshAccountCampaigns(accountId);
-                    }, 1000);
-                } else {
-                    showError('Fout bij synchroniseren: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showError('Er is een fout opgetreden bij het synchroniseren van campagnes.');
-            })
-            .finally(() => {
-                // Reset button
-                this.disabled = false;
-                this.innerHTML = '<i class="fas fa-sync-alt mr-2"></i>Campagnes Synchroniseren';
-            });
-        });
-    });
-
-    // Dynamic data refresh functionality
-    function refreshAccountCampaigns(accountId) {
-        fetch(`/facebook-ads/api/get-account-campaigns/?account_id=${accountId}`, {
-            method: 'GET',
-            headers: {
-                'X-CSRFToken': csrfToken
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                updateAccountCampaignsTable(accountId, data);
-                updateAccountInfo(accountId, data);
-                updateTabBadge(accountId, data.campaign_count);
-                showInfo('Campagne data bijgewerkt!');
-            } else {
-                showError('Fout bij het ophalen van bijgewerkte data: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error refreshing campaigns:', error);
-            showError('Er is een fout opgetreden bij het bijwerken van de campagne data.');
-        });
-    }
-
-    function updateAccountCampaignsTable(accountId, data) {
-        const tableBody = document.querySelector(`#account-tab-${accountId} tbody`);
-        if (!tableBody) return;
-
-        if (data.campaigns.length === 0) {
-            tableBody.innerHTML = `
-                <tr class="border-b transition-colors hover:bg-muted/50" data-slot="table-row">
-                    <td colspan="5" class="p-4 text-center text-muted-foreground">
-                        Geen campagnes gevonden. Klik op "Campagnes Synchroniseren" om campagnes op te halen.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        const campaignsHtml = data.campaigns.map(campaign => {
-            const isSelected = data.selected_campaign_ids.includes(campaign.id);
-            const statusClass = campaign.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                               campaign.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-800' :
-                               'bg-red-100 text-red-800';
-            
-            return `
-                <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                    <td class="p-4 align-middle" data-slot="table-cell">
-                        <input type="checkbox" 
-                               class="h-4 w-4 rounded border border-input bg-background text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 campaign-checkbox" 
-                               value="${campaign.id}"
-                               data-account-id="${accountId}"
-                               ${isSelected ? 'checked' : ''}>
-                    </td>
-                    <td class="p-4 align-middle" data-slot="table-cell">
-                        <div class="font-medium">${campaign.campaign_name}</div>
-                        <div class="text-sm text-muted-foreground">ID: ${campaign.campaign_id}</div>
-                    </td>
-                    <td class="p-4 align-middle" data-slot="table-cell">
-                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass}" data-slot="badge">
-                            ${campaign.status}
-                        </span>
-                        ${campaign.effective_status && campaign.effective_status !== campaign.status ? 
-                          `<div class="text-xs text-muted-foreground mt-1">${campaign.effective_status}</div>` : ''}
-                    </td>
-                    <td class="p-4 align-middle" data-slot="table-cell">
-                        <div class="text-sm">${campaign.last_synced ? formatDateTime(campaign.last_synced) : 'Niet gesynchroniseerd'}</div>
-                    </td>
-                    <td class="p-4 align-middle" data-slot="table-cell">
-                        ${campaign.start_time ? 
-                          `<div class="text-sm">${formatDate(campaign.start_time)}</div>` : 
-                          '<span class="text-muted-foreground">-</span>'}
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        tableBody.innerHTML = campaignsHtml;
-
-        // Re-attach event listeners for new checkboxes
-        attachCampaignCheckboxListeners(accountId);
-        updateSelectedCount(accountId);
-    }
-
-    function updateAccountInfo(accountId, data) {
-        const selectedCountElement = document.querySelector(`.selected-count[data-account-id="${accountId}"]`);
-        if (selectedCountElement) {
-            selectedCountElement.textContent = `${data.selected_count} geselecteerd`;
-        }
-    }
-
-    function updateTabBadge(accountId, campaignCount) {
-        const tabButton = document.querySelector(`.account-tab[data-account-id="${accountId}"] .bg-muted`);
-        if (tabButton) {
-            tabButton.textContent = `${campaignCount} campagnes`;
-        }
-    }
-
-    function formatDateTime(isoString) {
-        const date = new Date(isoString);
-        return date.toLocaleDateString('nl-NL', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        }) + ' ' + date.toLocaleTimeString('nl-NL', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-
-    function formatDate(isoString) {
-        const date = new Date(isoString);
-        return date.toLocaleDateString('nl-NL', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    }
-
-    function attachCampaignCheckboxListeners(accountId) {
-        // Remove existing listeners and re-attach for the specific account
-        document.querySelectorAll(`.campaign-checkbox[data-account-id="${accountId}"]`).forEach(checkbox => {
-            // Clone node to remove all event listeners
-            const newCheckbox = checkbox.cloneNode(true);
-            checkbox.parentNode.replaceChild(newCheckbox, checkbox);
-            
-            // Add event listener to new checkbox
-            newCheckbox.addEventListener('change', function() {
-                updateSelectedCount(accountId);
-            });
-        });
-    }
-
-    // Initial count updates for all accounts
-    document.querySelectorAll('.select-all-checkbox').forEach(checkbox => {
-        const accountId = checkbox.dataset.accountId;
-        updateSelectedCount(accountId);
-    });
-
-    // Notification functions
-    function showNotification(message, type = 'error', duration = 5000) {
-        const container = document.getElementById('notification-container');
-        const notificationId = 'notification-' + Date.now();
-        
-        const typeClasses = {
-            'error': 'bg-red-50 border-red-200 text-red-800',
-            'success': 'bg-green-50 border-green-200 text-green-800',
-            'warning': 'bg-yellow-50 border-yellow-200 text-yellow-800',
-            'info': 'bg-blue-50 border-blue-200 text-blue-800'
-        };
-        
-        const iconClasses = {
-            'error': 'fas fa-exclamation-circle text-red-500',
-            'success': 'fas fa-check-circle text-green-500',
-            'warning': 'fas fa-exclamation-triangle text-yellow-500',
-            'info': 'fas fa-info-circle text-blue-500'
-        };
-        
-        const notification = document.createElement('div');
-        notification.id = notificationId;
-        notification.className = `${typeClasses[type]} border rounded-lg p-4 shadow-lg max-w-sm transition-all duration-300 transform translate-x-full opacity-0`;
-        notification.innerHTML = `
-            <div class="flex items-start gap-3">
-                <i class="${iconClasses[type]} mt-0.5"></i>
-                <div class="flex-1">
-                    <p class="text-sm font-medium">${message}</p>
-                </div>
-                <button onclick="removeNotification('${notificationId}')" class="text-gray-400 hover:text-gray-600">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
-            </div>
-        `;
-        
-        container.appendChild(notification);
-        
-        // Trigger animation after adding to DOM
-        setTimeout(() => {
-            notification.classList.remove('translate-x-full', 'opacity-0');
-            notification.classList.add('translate-x-0', 'opacity-100');
-        }, 10);
-        
-        // Auto-remove after duration
-        if (duration > 0) {
-            setTimeout(() => {
-                removeNotification(notificationId);
-            }, duration);
-        }
-    }
-
-    function removeNotification(notificationId) {
-        const notification = document.getElementById(notificationId);
-        if (notification) {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }
-    }
-
-    function showError(message) {
-        showNotification(message, 'error');
-    }
-
-    function showSuccess(message) {
-        showNotification(message, 'success');
-    }
-
-    function showWarning(message) {
-        showNotification(message, 'warning');
-    }
-
-    function showInfo(message) {
-        showNotification(message, 'info');
-    }
-
-    // Make notification functions globally available
-    window.showNotification = showNotification;
-    window.removeNotification = removeNotification;
-    window.showError = showError;
-    window.showSuccess = showSuccess;
-    window.showWarning = showWarning;
-    window.showInfo = showInfo;
-});
-</script>
+{% block page_js %}
+<!-- Load modular JavaScript components via Vite -->
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% vite_asset 'assets/javascript/campaign-sync-manager.js' %}
+{% vite_asset 'assets/javascript/campaign-selection.js' %}
 {% endblock %} 

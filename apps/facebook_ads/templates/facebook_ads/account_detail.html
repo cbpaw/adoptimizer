@@ -1,0 +1,383 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block app %}
+<form style="display: none;">
+    {% csrf_token %}
+</form>
+
+<div class="space-y-6">
+    <!-- Header Card -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'facebook_ads:settings' %}" class="text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <i class="fab fa-facebook text-blue-600 text-2xl"></i>
+                    <div>
+                        <div class="leading-none font-semibold text-2xl">{{ account.ad_account_name }}</div>
+                        <div class="text-muted-foreground text-sm">Account ID: {{ account.ad_account_id }}</div>
+                    </div>
+                </div>
+                
+                <!-- Connection Status -->
+                <div class="flex items-center gap-2">
+                    {% if connection_status == 'active' %}
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
+                            <i class="fas fa-check-circle mr-1"></i>
+                            {% translate "Verbonden" %}
+                        </span>
+                    {% elif connection_status == 'error' %}
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800" data-slot="badge">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>
+                            {% translate "Verbindingsfout" %}
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800" data-slot="badge">
+                            <i class="fas fa-question-circle mr-1"></i>
+                            {% translate "Onbekend" %}
+                        </span>
+                    {% endif %}
+                    
+                    <button 
+                        onclick="testAccountConnection('{{ account.id }}')"
+                        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-8 px-3"
+                        data-slot="button"
+                    >
+                        <i class="fas fa-sync"></i>
+                        {% translate "Test Verbinding" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Information Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Account Overview -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Basic Info Card -->
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="leading-none font-semibold">{% translate "Account Informatie" %}</div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Account Status" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">
+                                {% if account_info.account_status %}
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
+                                        {% if account_info.account_status == '1' %}bg-green-100 text-green-800
+                                        {% elif account_info.account_status == '2' %}bg-red-100 text-red-800
+                                        {% else %}bg-yellow-100 text-yellow-800{% endif %}" data-slot="badge">
+                                        {% if account_info.account_status == '1' %}Actief{% elif account_info.account_status == '2' %}Uitgeschakeld{% else %}{{ account_info.account_status }}{% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted-foreground">Onbekend</span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Valuta" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">{{ account_info.currency|default:"Onbekend" }}</dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Tijdzone" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">{{ account_info.timezone_name|default:"Onbekend" }}</dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "App ID" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground font-mono">{{ account.app_id }}</dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Toegevoegd op" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">{{ account.created_at|date:"d M Y H:i" }}</dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Laatst bijgewerkt" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">{{ account.updated_at|date:"d M Y H:i" }}</dd>
+                        </div>
+                        
+                        {% if account_info.business %}
+                        <div class="md:col-span-2">
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Business Manager" %}</dt>
+                            <dd class="mt-1 text-sm text-foreground">
+                                {% if account_info.business.name %}
+                                    {{ account_info.business.name }} ({{ account_info.business.id }})
+                                {% else %}
+                                    {{ account_info.business.id }}
+                                {% endif %}
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Financial Info Card -->
+            {% if account_info.amount_spent or account_info.balance or account_info.spend_cap %}
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="leading-none font-semibold">{% translate "Financiële Informatie" %}</div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    <dl class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {% if account_info.amount_spent %}
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Totaal Uitgegeven" %}</dt>
+                            <dd class="mt-1 text-lg font-semibold text-foreground">
+                                {{ account_info.currency|default:"EUR" }} {{ account_info.amount_spent|floatformat:2 }}
+                            </dd>
+                        </div>
+                        {% endif %}
+                        
+                        {% if account_info.balance %}
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Saldo" %}</dt>
+                            <dd class="mt-1 text-lg font-semibold text-foreground">
+                                {{ account_info.currency|default:"EUR" }} {{ account_info.balance|floatformat:2 }}
+                            </dd>
+                        </div>
+                        {% endif %}
+                        
+                        {% if account_info.spend_cap %}
+                        <div>
+                            <dt class="text-sm font-medium text-muted-foreground">{% translate "Uitgavenlimiet" %}</dt>
+                            <dd class="mt-1 text-lg font-semibold text-foreground">
+                                {{ account_info.currency|default:"EUR" }} {{ account_info.spend_cap|floatformat:2 }}
+                            </dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Campaigns Card -->
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="flex items-center justify-between">
+                        <div class="leading-none font-semibold">{% translate "Campagnes" %}</div>
+                        <span class="text-sm text-muted-foreground">
+                            {{ campaigns.count }} campagne{{ campaigns.count|pluralize }} totaal
+                        </span>
+                    </div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    {% if campaigns %}
+                        <div class="space-y-3">
+                            {% for campaign in campaigns|slice:":10" %}
+                                <div class="flex items-center justify-between p-3 rounded-lg border {% if campaign in selected_campaigns %}bg-green-50 border-green-200{% else %}bg-muted/50{% endif %}">
+                                    <div class="flex-1">
+                                        <div class="font-medium">{{ campaign.campaign_name }}</div>
+                                        <div class="text-sm text-muted-foreground">
+                                            ID: {{ campaign.campaign_id }} • 
+                                            Status: {{ campaign.status }} • 
+                                            {% if campaign.start_time %}Started: {{ campaign.start_time|date:"d M Y" }}{% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        {% for selected in selected_campaigns %}
+                                            {% if selected.campaign == campaign %}
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
+                                                    <i class="fas fa-eye mr-1"></i>
+                                                    Monitoring
+                                                </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800" data-slot="badge">
+                                            {{ campaign.effective_status|default:campaign.status }}
+                                        </span>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            
+                            {% if campaigns.count > 10 %}
+                                <div class="text-center pt-3">
+                                    <a href="{% url 'facebook_ads:campaign_selection' %}" class="text-primary hover:underline text-sm">
+                                        {% translate "Bekijk alle campagnes" %} ({{ campaigns.count }} totaal)
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-8">
+                            <i class="fas fa-bullhorn text-4xl text-muted-foreground mb-4"></i>
+                            <p class="text-muted-foreground">{% translate "Geen campagnes gevonden voor dit account" %}</p>
+                            <button 
+                                onclick="syncCampaigns('{{ account.id }}')"
+                                class="mt-4 cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                                data-slot="button"
+                            >
+                                <i class="fas fa-sync mr-1"></i>
+                                {% translate "Campagnes Synchroniseren" %}
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Sidebar -->
+        <div class="space-y-6">
+            <!-- Quick Stats -->
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="leading-none font-semibold">{% translate "Snelle Statistieken" %}</div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground">{% translate "Totaal Campagnes" %}</span>
+                            <span class="text-lg font-semibold">{{ stats.total_campaigns }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground">{% translate "Gemonitorde Campagnes" %}</span>
+                            <span class="text-lg font-semibold">{{ stats.selected_campaigns }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-muted-foreground">{% translate "Totaal Advertenties" %}</span>
+                            <span class="text-lg font-semibold">{{ stats.total_ads }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="leading-none font-semibold">{% translate "Snelle Acties" %}</div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    <div class="space-y-3">
+                        <button 
+                            onclick="syncCampaigns('{{ account.id }}')"
+                            class="w-full cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2"
+                            data-slot="button"
+                        >
+                            <i class="fas fa-sync mr-1"></i>
+                            {% translate "Campagnes Synchroniseren" %}
+                        </button>
+                        
+                        <a 
+                            href="{% url 'facebook_ads:campaign_selection' %}"
+                            class="w-full cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                            data-slot="button"
+                        >
+                            <i class="fas fa-bullhorn mr-1"></i>
+                            {% translate "Beheer Campagnes" %}
+                        </a>
+                        
+                        <button 
+                            onclick="testAccountConnection('{{ account.id }}')"
+                            class="w-full cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                            data-slot="button"
+                        >
+                            <i class="fas fa-link mr-1"></i>
+                            {% translate "Test Verbinding" %}
+                        </a>
+                        
+                        <a 
+                            href="{% url 'facebook_ads:settings' %}"
+                            class="w-full cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                            data-slot="button"
+                        >
+                            <i class="fas fa-cog mr-1"></i>
+                            {% translate "Instellingen" %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Actions -->
+            <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+                <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                    <div class="leading-none font-semibold text-destructive">{% translate "Gevaarlijke Acties" %}</div>
+                </div>
+                <div class="px-6" data-slot="card-content">
+                    <button 
+                        onclick="disconnectAccount('{{ account.id }}', '{{ account.ad_account_name }}')"
+                        class="w-full cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-destructive bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90 h-9 px-4 py-2"
+                        data-slot="button"
+                    >
+                        <i class="fas fa-unlink mr-1"></i>
+                        {% translate "Account Ontkoppelen" %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for account detail functionality -->
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% vite_asset 'assets/javascript/facebook-settings.js' %}
+
+<script>
+// Add account detail specific functions
+window.syncCampaigns = function(accountId) {
+    console.log('Syncing campaigns for account:', accountId);
+    
+    fetch('/facebook-ads/api/fetch-campaigns-for-account/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ account_id: accountId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.showSuccess(`Campagnes gesynchroniseerd!\n\n${data.message}`);
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            window.showError(`Synchronisatie mislukt!\n\n${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Error syncing campaigns:', error);
+        window.showError('Er is een fout opgetreden bij het synchroniseren van campagnes');
+    });
+};
+
+window.disconnectAccount = function(accountId, accountName) {
+    if (confirm(`Weet je zeker dat je het account "${accountName}" wilt ontkoppelen? Dit zal alle gekoppelde campagnes en advertenties verwijderen.`)) {
+        fetch('/facebook-ads/api/disconnect-account/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ account_id: accountId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.showSuccess(`Account ontkoppeld!\n\n${data.message}`);
+                setTimeout(() => {
+                    window.location.href = '/facebook-ads/settings/';
+                }, 2000);
+            } else {
+                window.showError(`Ontkoppelen mislukt!\n\n${data.message}`);
+            }
+        })
+        .catch(error => {
+            console.error('Error disconnecting account:', error);
+            window.showError('Er is een fout opgetreden bij het ontkoppelen van het account');
+        });
+    }
+};
+</script>
+{% endblock %}

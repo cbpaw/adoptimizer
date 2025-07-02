@@ -1,0 +1,244 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+{% load tz %}
+{% load django_vite %}
+
+{% block title %}{{ campaign.campaign_name }} - Campaign Details{% endblock %}
+
+{% block app %}
+<!-- Hidden form for CSRF token -->
+<form style="display: none;">
+    {% csrf_token %}
+</form>
+
+<!-- Chart Data Scripts (hidden elements for JavaScript access) -->
+{{ chart_dates|json_script:"chart-dates" }}
+{{ impressions_data|json_script:"impressions-data" }}
+{{ clicks_data|json_script:"clicks-data" }}
+{{ spend_data|json_script:"spend-data" }}
+{{ campaign.ad_account.id|json_script:"account-id" }}
+
+<div class="space-y-6">
+    <!-- Campaign Header Card -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                        <a href="{% url 'facebook_ads:campaign_selection' %}" class="hover:text-foreground">Campagnes</a>
+                        <i class="fa fa-chevron-right text-xs"></i>
+                        <span>{{ campaign.campaign_name }}</span>
+                        <span class="ml-auto text-xs">Bijgewerkt {{ campaign.last_synced|localtime|timesince }} geleden</span>
+                        <div class="flex items-center gap-1 ml-2">
+                            {% if campaign.is_selected %}
+                                <i class="fa fa-eye text-green-500" title="Wordt gemonitord"></i>
+                            {% else %}
+                                <i class="fa fa-eye-slash text-muted-foreground" title="Wordt niet gemonitord"></i>
+                            {% endif %}
+                            <button class="btn btn-sm btn-outline" onclick="syncCampaign()">
+                                <i class="fa fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="leading-none font-semibold text-2xl" data-slot="card-title">{{ campaign.campaign_name }}</div>
+                    <div class="text-muted-foreground text-sm mt-1">
+                        Status: 
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
+                            {% if campaign.status == 'ACTIVE' %}bg-green-100 text-green-800
+                            {% elif campaign.status == 'PAUSED' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-red-100 text-red-800{% endif %}" data-slot="badge">
+                            {{ campaign.status }}
+                        </span>
+                        | ID: {{ campaign.campaign_id }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Total Ads Card -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-muted-foreground text-sm" data-slot="card-description">Totaal Advertenties</div>
+                        <div class="leading-none font-semibold text-3xl" data-slot="card-title">{{ ads_count }}</div>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-ad text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Spend Card -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-muted-foreground text-sm" data-slot="card-description">Totale Uitgaven</div>
+                        <div class="leading-none font-semibold text-3xl" data-slot="card-title">${{ total_spend|floatformat:2 }}</div>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-dollar-sign text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Impressions Card -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-muted-foreground text-sm" data-slot="card-description">Impressies</div>
+                        <div class="leading-none font-semibold text-3xl" data-slot="card-title">{{ total_impressions|floatformat:0 }}</div>
+                    </div>
+                    <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-eye text-orange-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clicks & CTR Card -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-muted-foreground text-sm" data-slot="card-description">Clicks & CTR</div>
+                        <div class="leading-none font-semibold text-2xl" data-slot="card-title">{{ total_clicks }}</div>
+                        <div class="text-muted-foreground text-sm">{{ avg_ctr|floatformat:2 }}% CTR</div>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-mouse-pointer text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Impressions Chart -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="leading-none font-semibold" data-slot="card-title">Impressies Trend</div>
+                <div class="text-muted-foreground text-sm" data-slot="card-description">Laatste 30 dagen</div>
+            </div>
+            <div class="px-6" data-slot="card-content">
+                <div class="h-64">
+                    <canvas id="impressions-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clicks Chart -->
+        <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+            <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+                <div class="leading-none font-semibold" data-slot="card-title">Clicks Trend</div>
+                <div class="text-muted-foreground text-sm" data-slot="card-description">Laatste 30 dagen</div>
+            </div>
+            <div class="px-6" data-slot="card-content">
+                <div class="h-64">
+                    <canvas id="clicks-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Spend Chart -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="leading-none font-semibold" data-slot="card-title">Dagelijkse Uitgaven</div>
+            <div class="text-muted-foreground text-sm" data-slot="card-description">Laatste 30 dagen</div>
+        </div>
+        <div class="px-6" data-slot="card-content">
+            <div class="h-64">
+                <canvas id="spend-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ads Table -->
+    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
+        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
+            <div class="leading-none font-semibold" data-slot="card-title">Advertenties</div>
+            <div class="text-muted-foreground text-sm" data-slot="card-description">Alle advertenties binnen deze campagne</div>
+        </div>
+        <div class="px-6" data-slot="card-content">
+            <div class="overflow-x-auto">
+                <table class="w-full caption-bottom text-sm" data-slot="table">
+                    <thead class="[&_tr]:border-b" data-slot="table-header">
+                        <tr class="border-b transition-colors hover:bg-muted/50" data-slot="table-row">
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Ad Naam</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Status</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Ad Set</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Impressies</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Clicks</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">CTR</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">Uitgaven</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground" data-slot="table-head">CPC</th>
+                        </tr>
+                    </thead>
+                    <tbody class="[&_tr:last-child]:border-0" data-slot="table-body">
+                        {% for ad in ads %}
+                        <tr class="border-b transition-colors hover:bg-muted/50" data-slot="table-row">
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                <div class="font-medium">{{ ad.ad_name }}</div>
+                                <div class="text-xs text-muted-foreground">ID: {{ ad.ad_id }}</div>
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
+                                    {% if ad.status == 'ACTIVE' %}bg-green-100 text-green-800
+                                    {% elif ad.status == 'PAUSED' %}bg-yellow-100 text-yellow-800
+                                    {% else %}bg-red-100 text-red-800{% endif %}" data-slot="badge">
+                                    {{ ad.status }}
+                                </span>
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                <div class="text-sm">{{ ad.adset_name|truncatechars:30|default:"-" }}</div>
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                {{ ad.impressions|floatformat:0 }}
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                {{ ad.clicks }}
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                {{ ad.ctr|floatformat:2 }}%
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                ${{ ad.spend|floatformat:2 }}
+                            </td>
+                            <td class="p-4 align-middle" data-slot="table-cell">
+                                ${{ ad.cpc|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="p-8 text-center" data-slot="table-cell">
+                                <div class="text-center">
+                                    <i class="fas fa-ad text-4xl text-muted-foreground mb-4"></i>
+                                    <p class="text-lg font-medium">Geen advertenties gevonden</p>
+                                    <p class="text-sm text-muted-foreground">Synchroniseer de campagne om advertentie data te laden</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+<!-- Load modular JavaScript components via Vite -->
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% vite_asset 'assets/javascript/campaign-detail.js' %}
+{% endblock %} 

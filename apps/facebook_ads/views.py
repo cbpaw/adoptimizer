@@ -15,7 +15,7 @@ from rest_framework import status
 import json
 
 from .models import FacebookAdAccount, FacebookAd, FacebookCampaign, SelectedCampaign
-from .services import FacebookMarketingAPIService, get_facebook_auth_url, exchange_code_for_token
+from .services import FacebookMarketingAPIService, ComprehensiveFacebookAPIService, get_facebook_auth_url, exchange_code_for_token
 
 logger = logging.getLogger(__name__)
 
@@ -671,6 +671,95 @@ def campaign_selection(request):
     })
 
 
+@login_required
+def campaign_detail(request, campaign_id):
+    """View for campaign detail page with analytics and ads"""
+    # Get the campaign and verify it belongs to user's accounts
+    campaign = get_object_or_404(
+        FacebookCampaign, 
+        id=campaign_id, 
+        ad_account__user=request.user,
+        ad_account__is_active=True
+    )
+    
+    # Get all ads for this campaign
+    ads = FacebookAd.objects.filter(
+        ad_account=campaign.ad_account,
+        campaign_id=campaign.campaign_id
+    ).order_by('-last_synced')
+    
+    # Calculate campaign metrics
+    total_ads = ads.count()
+    active_ads = ads.filter(status='ACTIVE').count()
+    paused_ads = ads.filter(status='PAUSED').count()
+    
+    # Performance metrics
+    total_impressions = sum(ad.impressions for ad in ads)
+    total_clicks = sum(ad.clicks for ad in ads)
+    total_spend = sum(ad.spend for ad in ads)
+    
+    # Calculate averages
+    avg_ctr = sum(ad.ctr for ad in ads) / total_ads if total_ads > 0 else 0
+    avg_cpm = sum(ad.cpm for ad in ads) / total_ads if total_ads > 0 else 0
+    avg_cpc = sum(ad.cpc for ad in ads) / total_ads if total_ads > 0 else 0
+    
+    # Check if campaign is selected for monitoring
+    is_selected = SelectedCampaign.objects.filter(
+        user=request.user,
+        campaign=campaign,
+        is_monitoring=True
+    ).exists()
+    
+    # Prepare data for charts (last 30 days simulation)
+    from datetime import datetime, timedelta
+    import random
+    
+    # Generate sample chart data (in real implementation, this would come from historical data)
+    chart_dates = []
+    impressions_data = []
+    clicks_data = []
+    spend_data = []
+    
+    for i in range(30):
+        date = datetime.now() - timedelta(days=29-i)
+        chart_dates.append(date.strftime('%Y-%m-%d'))
+        
+        # Simulate realistic daily variations
+        base_impressions = total_impressions / 30 if total_impressions > 0 else 1000
+        daily_impressions = int(base_impressions * (0.7 + random.random() * 0.6))
+        impressions_data.append(daily_impressions)
+        
+        base_clicks = total_clicks / 30 if total_clicks > 0 else 50
+        daily_clicks = int(base_clicks * (0.7 + random.random() * 0.6))
+        clicks_data.append(daily_clicks)
+        
+        base_spend = float(total_spend) / 30 if total_spend > 0 else 100
+        daily_spend = round(base_spend * (0.7 + random.random() * 0.6), 2)
+        spend_data.append(daily_spend)
+    
+    context = {
+        'campaign': campaign,
+        'ads': ads,
+        'is_selected': is_selected,
+        'total_ads': total_ads,
+        'active_ads': active_ads,
+        'paused_ads': paused_ads,
+        'total_impressions': total_impressions,
+        'total_clicks': total_clicks,
+        'total_spend': float(total_spend),
+        'avg_ctr': avg_ctr,
+        'avg_cpm': float(avg_cpm),
+        'avg_cpc': float(avg_cpc),
+        'chart_dates': chart_dates,
+        'impressions_data': impressions_data,
+        'clicks_data': clicks_data,
+        'spend_data': spend_data,
+        'active_tab': 'campaigns'
+    }
+    
+    return render(request, 'facebook_ads/campaign_detail.html', context)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def fetch_campaigns(request):
@@ -1124,6 +1213,629 @@ def get_account_campaigns(request):
         
     except Exception as e:
         logger.error(f"Error getting account campaigns: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@login_required
+def account_detail(request, account_id):
+    """Detailed view for a specific Facebook ad account"""
+    # Get the account and verify it belongs to the user
+    account = get_object_or_404(
+        FacebookAdAccount, 
+        id=account_id, 
+        user=request.user, 
+        is_active=True
+    )
+    
+    # Get Facebook account info from API
+    account_info = {}
+    connection_status = 'unknown'
+    try:
+        api_version = 'v19.0'
+        url = f'https://graph.facebook.com/{api_version}/act_{account.ad_account_id}'
+        params = {
+            'access_token': account.access_token,
+            'fields': 'id,name,account_status,currency,timezone_name,min_campaign_group_spend_cap,spend_cap,amount_spent,balance,account_id,business,created_time,funding_source_details,owner,partner,disable_reason,end_advertiser,end_advertiser_name,is_notifications_enabled,is_personal,is_prepay_account,is_tax_id_required,line_numbers,media_agency,offsite_pixels_tos_accepted,tax_id,tax_id_status,tax_id_type,timezone_id,timezone_offset_hours_utc,tos_accepted,user_tasks,user_tos_accepted'
+        }
+        
+        response = requests.get(url, params=params)
+        
+        if response.status_code == 200:
+            account_info = response.json()
+            connection_status = 'active'
+        else:
+            connection_status = 'error'
+            logger.error(f"Facebook API error for account {account.ad_account_id}: {response.text}")
+    except Exception as e:
+        connection_status = 'error'
+        logger.error(f"Error fetching account info: {str(e)}")
+    
+    # Get campaigns for this account
+    campaigns = FacebookCampaign.objects.filter(ad_account=account).order_by('-start_time')
+    
+    # Get selected campaigns
+    selected_campaigns = SelectedCampaign.objects.filter(
+        user=request.user,
+        is_monitoring=True,
+        campaign__ad_account=account
+    ).select_related('campaign')
+    
+    # Get ads for this account
+    ads = FacebookAd.objects.filter(ad_account=account).order_by('-last_synced')[:50]
+    
+    # Calculate statistics
+    stats = {
+        'total_campaigns': campaigns.count(),
+        'selected_campaigns': selected_campaigns.count(),
+        'total_ads': ads.count(),
+        'account_spend': account_info.get('amount_spent', 0),
+        'account_balance': account_info.get('balance', 0),
+        'spend_cap': account_info.get('spend_cap', 0),
+    }
+    
+    return render(request, 'facebook_ads/account_detail.html', {
+        'account': account,
+        'account_info': account_info,
+        'connection_status': connection_status,
+        'campaigns': campaigns,
+        'selected_campaigns': selected_campaigns,
+        'ads': ads,
+        'stats': stats,
+        'active_tab': 'accounts'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def pause_campaign(request):
+    """Pause a Facebook campaign"""
+    try:
+        campaign_id = request.data.get('campaign_id')
+        
+        if not campaign_id:
+            return Response({
+                'success': False,
+                'message': 'Campaign ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the campaign and verify it belongs to the user
+        campaign = FacebookCampaign.objects.filter(
+            campaign_id=campaign_id,
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        ).first()
+        
+        if not campaign:
+            return Response({
+                'success': False,
+                'message': 'Campaign not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Make API call to Facebook to pause the campaign
+        api_version = 'v19.0'
+        url = f'https://graph.facebook.com/{api_version}/{campaign_id}'
+        
+        data = {
+            'status': 'PAUSED',
+            'access_token': campaign.ad_account.access_token
+        }
+        
+        response = requests.post(url, data=data)
+        
+        if response.status_code == 200:
+            # Update local campaign status
+            campaign.status = 'PAUSED'
+            campaign.effective_status = 'PAUSED'
+            campaign.save()
+            
+            return Response({
+                'success': True,
+                'message': f'Campaign "{campaign.campaign_name}" has been paused'
+            })
+        else:
+            logger.error(f"Facebook API error pausing campaign {campaign_id}: {response.text}")
+            return Response({
+                'success': False,
+                'message': 'Failed to pause campaign on Facebook'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    except Exception as e:
+        logger.error(f"Error pausing campaign: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def resume_campaign(request):
+    """Resume a Facebook campaign"""
+    try:
+        campaign_id = request.data.get('campaign_id')
+        
+        if not campaign_id:
+            return Response({
+                'success': False,
+                'message': 'Campaign ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the campaign and verify it belongs to the user
+        campaign = FacebookCampaign.objects.filter(
+            campaign_id=campaign_id,
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        ).first()
+        
+        if not campaign:
+            return Response({
+                'success': False,
+                'message': 'Campaign not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Make API call to Facebook to resume the campaign
+        api_version = 'v19.0'
+        url = f'https://graph.facebook.com/{api_version}/{campaign_id}'
+        
+        data = {
+            'status': 'ACTIVE',
+            'access_token': campaign.ad_account.access_token
+        }
+        
+        response = requests.post(url, data=data)
+        
+        if response.status_code == 200:
+            # Update local campaign status
+            campaign.status = 'ACTIVE'
+            campaign.effective_status = 'ACTIVE'
+            campaign.save()
+            
+            return Response({
+                'success': True,
+                'message': f'Campaign "{campaign.campaign_name}" has been resumed'
+            })
+        else:
+            logger.error(f"Facebook API error resuming campaign {campaign_id}: {response.text}")
+            return Response({
+                'success': False,
+                'message': 'Failed to resume campaign on Facebook'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    except Exception as e:
+        logger.error(f"Error resuming campaign: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def comprehensive_sync_campaigns(request):
+    """Comprehensive sync of campaigns with detailed insights and budget information"""
+    try:
+        account_id = request.data.get('account_id')
+        
+        if not account_id:
+            return Response({
+                'success': False,
+                'message': 'Account ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the specific account
+        account = FacebookAdAccount.objects.filter(
+            id=account_id,
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not account:
+            return Response({
+                'success': False,
+                'message': 'Account not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            # Use comprehensive service for detailed data
+            service = ComprehensiveFacebookAPIService(account)
+            
+            # Fetch comprehensive campaign data
+            campaigns_data = service.fetch_comprehensive_campaigns(limit=100)
+            
+            # Sync to database with all comprehensive fields
+            synced_count = service.sync_comprehensive_campaigns_to_database(campaigns_data)
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully synced {synced_count} campaigns with comprehensive data for {account.ad_account_name}',
+                'synced_count': synced_count,
+                'account_name': account.ad_account_name,
+                'data_types': [
+                    'Basic campaign info',
+                    'Budget information',
+                    'Performance metrics',
+                    'Advanced insights',
+                    'Actions and conversions data',
+                    'Video engagement metrics'
+                ]
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in comprehensive campaign sync for account {account.ad_account_id}: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Error syncing comprehensive campaigns: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    except Exception as e:
+        logger.error(f"Error in comprehensive_sync_campaigns: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def comprehensive_sync_ads(request):
+    """Comprehensive sync of ads with creative information and detailed insights"""
+    try:
+        account_id = request.data.get('account_id')
+        
+        if not account_id:
+            return Response({
+                'success': False,
+                'message': 'Account ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the specific account
+        account = FacebookAdAccount.objects.filter(
+            id=account_id,
+            user=request.user,
+            is_active=True
+        ).first()
+        
+        if not account:
+            return Response({
+                'success': False,
+                'message': 'Account not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            # Use comprehensive service for detailed data
+            service = ComprehensiveFacebookAPIService(account)
+            
+            # Fetch comprehensive ads data
+            ads_data = service.fetch_comprehensive_ads(limit=200)
+            
+            # Sync to database with all comprehensive fields
+            synced_count = service.sync_comprehensive_ads_to_database(ads_data)
+            
+            return Response({
+                'success': True,
+                'message': f'Successfully synced {synced_count} ads with comprehensive data for {account.ad_account_name}',
+                'synced_count': synced_count,
+                'account_name': account.ad_account_name,
+                'data_types': [
+                    'Basic ad information',
+                    'Creative details (title, body, images, videos)',
+                    'Campaign and adset info',
+                    'Performance metrics',
+                    'Advanced insights',
+                    'Video engagement metrics',
+                    'Quality rankings',
+                    'Actions and conversions data',
+                    'Targeting information'
+                ]
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in comprehensive ads sync for account {account.ad_account_id}: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Error syncing comprehensive ads: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    except Exception as e:
+        logger.error(f"Error in comprehensive_sync_ads: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_campaign_detailed_insights(request):
+    """Get detailed insights for a specific campaign with custom parameters"""
+    try:
+        campaign_id = request.data.get('campaign_id')
+        time_range = request.data.get('time_range')  # Optional custom time range
+        
+        if not campaign_id:
+            return Response({
+                'success': False,
+                'message': 'Campaign ID is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get the campaign and verify it belongs to user's accounts
+        campaign = FacebookCampaign.objects.filter(
+            campaign_id=campaign_id,
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        ).first()
+        
+        if not campaign:
+            return Response({
+                'success': False,
+                'message': 'Campaign not found or not accessible'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            # Use comprehensive service for detailed insights
+            service = ComprehensiveFacebookAPIService(campaign.ad_account)
+            
+            # Get detailed insights
+            insights_data = service.get_campaign_detailed_insights(campaign_id, time_range)
+            
+            # Process and structure the response
+            processed_insights = {
+                'campaign_info': {
+                    'id': campaign.campaign_id,
+                    'name': campaign.campaign_name,
+                    'status': campaign.status,
+                    'objective': campaign.objective,
+                },
+                'performance_metrics': {
+                    'impressions': int(insights_data.get('impressions', 0) or 0),
+                    'clicks': int(insights_data.get('clicks', 0) or 0),
+                    'spend': float(insights_data.get('spend', 0) or 0),
+                    'reach': int(insights_data.get('reach', 0) or 0),
+                    'frequency': float(insights_data.get('frequency', 0) or 0),
+                    'ctr': float(insights_data.get('ctr', 0) or 0),
+                    'cpm': float(insights_data.get('cpm', 0) or 0),
+                    'cpc': float(insights_data.get('cpc', 0) or 0),
+                },
+                'advanced_metrics': {
+                    'purchase_roas': float(insights_data.get('purchase_roas', 0) or 0),
+                    'website_purchase_roas': float(insights_data.get('website_purchase_roas', 0) or 0),
+                    'link_url_clicks': int(insights_data.get('link_url_clicks', 0) or 0),
+                    'inline_link_clicks': int(insights_data.get('inline_link_clicks', 0) or 0),
+                    'outbound_clicks': int(insights_data.get('outbound_clicks', 0) or 0),
+                },
+                'video_metrics': {
+                    'video_p25_watched': int(insights_data.get('video_p25_watched_actions', 0) or 0),
+                    'video_p50_watched': int(insights_data.get('video_p50_watched_actions', 0) or 0),
+                    'video_p75_watched': int(insights_data.get('video_p75_watched_actions', 0) or 0),
+                    'video_p100_watched': int(insights_data.get('video_p100_watched_actions', 0) or 0),
+                },
+                'actions_data': insights_data.get('actions_data', {}),
+                'conversions_data': insights_data.get('conversions_data', {}),
+            }
+            
+            return Response({
+                'success': True,
+                'campaign_insights': processed_insights,
+                'time_range_used': time_range or 'Last 30 days'
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting detailed insights for campaign {campaign_id}: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f'Error fetching detailed insights: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    except Exception as e:
+        logger.error(f"Error in get_campaign_detailed_insights: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_comprehensive_campaign_data(request):
+    """Get comprehensive campaign data from database with all metrics"""
+    try:
+        account_id = request.GET.get('account_id')
+        campaign_filter = request.GET.get('filter', 'all')  # all, active, selected
+        
+        # Base queryset
+        campaigns_queryset = FacebookCampaign.objects.filter(
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        ).select_related('ad_account')
+        
+        # Apply account filter if specified
+        if account_id:
+            campaigns_queryset = campaigns_queryset.filter(ad_account__id=account_id)
+        
+        # Apply campaign filter
+        if campaign_filter == 'active':
+            campaigns_queryset = campaigns_queryset.filter(status__in=['ACTIVE', 'LEARNING'])
+        elif campaign_filter == 'selected':
+            selected_campaign_ids = SelectedCampaign.objects.filter(
+                user=request.user,
+                is_monitoring=True
+            ).values_list('campaign__id', flat=True)
+            campaigns_queryset = campaigns_queryset.filter(id__in=selected_campaign_ids)
+        
+        # Serialize comprehensive campaign data
+        campaigns_data = []
+        for campaign in campaigns_queryset.order_by('-last_synced'):
+            campaigns_data.append({
+                'id': campaign.id,
+                'campaign_id': campaign.campaign_id,
+                'campaign_name': campaign.campaign_name,
+                'status': campaign.status,
+                'effective_status': campaign.effective_status,
+                'objective': campaign.objective,
+                'account_name': campaign.ad_account.ad_account_name,
+                
+                # Budget information
+                'daily_budget': float(campaign.daily_budget) if campaign.daily_budget else None,
+                'lifetime_budget': float(campaign.lifetime_budget) if campaign.lifetime_budget else None,
+                'budget_remaining': float(campaign.budget_remaining) if campaign.budget_remaining else None,
+                'spend_cap': float(campaign.spend_cap) if campaign.spend_cap else None,
+                'bid_strategy': campaign.bid_strategy,
+                'buying_type': campaign.buying_type,
+                
+                # Performance metrics
+                'impressions': campaign.impressions,
+                'clicks': campaign.clicks,
+                'spend': float(campaign.spend),
+                'reach': campaign.reach,
+                'frequency': campaign.frequency,
+                'ctr': campaign.ctr,
+                'cpm': float(campaign.cpm),
+                'cpc': float(campaign.cpc),
+                
+                # Advanced metrics
+                'purchase_roas': campaign.purchase_roas,
+                'website_purchase_roas': campaign.website_purchase_roas,
+                'link_url_clicks': campaign.link_url_clicks,
+                'inline_link_clicks': campaign.inline_link_clicks,
+                'outbound_clicks': campaign.outbound_clicks,
+                
+                # Complex data
+                'actions_data': campaign.actions_data,
+                'conversions_data': campaign.conversions_data,
+                'special_ad_categories': campaign.special_ad_categories,
+                
+                # Timestamps
+                'created_time': campaign.created_time.isoformat() if campaign.created_time else None,
+                'updated_time': campaign.updated_time.isoformat() if campaign.updated_time else None,
+                'start_time': campaign.start_time.isoformat() if campaign.start_time else None,
+                'stop_time': campaign.stop_time.isoformat() if campaign.stop_time else None,
+                'last_synced': campaign.last_synced.isoformat(),
+            })
+        
+        return Response({
+            'success': True,
+            'campaigns': campaigns_data,
+            'total_count': len(campaigns_data),
+            'filter_applied': campaign_filter
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_comprehensive_campaign_data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'An error occurred: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_comprehensive_ads_data(request):
+    """Get comprehensive ads data from database with all metrics and creative info"""
+    try:
+        account_id = request.GET.get('account_id')
+        campaign_id = request.GET.get('campaign_id')
+        limit = int(request.GET.get('limit', 50))
+        
+        # Base queryset
+        ads_queryset = FacebookAd.objects.filter(
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        ).select_related('ad_account')
+        
+        # Apply filters
+        if account_id:
+            ads_queryset = ads_queryset.filter(ad_account__id=account_id)
+        
+        if campaign_id:
+            ads_queryset = ads_queryset.filter(campaign_id=campaign_id)
+        
+        # Serialize comprehensive ads data
+        ads_data = []
+        for ad in ads_queryset.order_by('-last_synced')[:limit]:
+            ads_data.append({
+                'id': ad.id,
+                'ad_id': ad.ad_id,
+                'ad_name': ad.ad_name,
+                'status': ad.status,
+                'effective_status': ad.effective_status,
+                'configured_status': ad.configured_status,
+                'account_name': ad.ad_account.ad_account_name,
+                
+                # Campaign and Adset info
+                'campaign_id': ad.campaign_id,
+                'campaign_name': ad.campaign_name,
+                'campaign_objective': ad.campaign_objective,
+                'adset_id': ad.adset_id,
+                'adset_name': ad.adset_name,
+                'optimization_goal': ad.optimization_goal,
+                'billing_event': ad.billing_event,
+                'bid_amount': float(ad.bid_amount) if ad.bid_amount else None,
+                
+                # Creative information
+                'creative_id': ad.creative_id,
+                'creative_title': ad.creative_title,
+                'creative_body': ad.creative_body,
+                'creative_image_url': ad.creative_image_url,
+                'creative_video_id': ad.creative_video_id,
+                'call_to_action_type': ad.call_to_action_type,
+                
+                # Performance metrics
+                'impressions': ad.impressions,
+                'clicks': ad.clicks,
+                'spend': float(ad.spend),
+                'reach': ad.reach,
+                'frequency': ad.frequency,
+                'ctr': ad.ctr,
+                'cpm': float(ad.cpm),
+                'cpc': float(ad.cpc),
+                
+                # Advanced metrics
+                'purchase_roas': ad.purchase_roas,
+                'website_purchase_roas': ad.website_purchase_roas,
+                'link_url_clicks': ad.link_url_clicks,
+                'inline_link_clicks': ad.inline_link_clicks,
+                'outbound_clicks': ad.outbound_clicks,
+                'unique_clicks': ad.unique_clicks,
+                'unique_ctr': ad.unique_ctr,
+                
+                # Video engagement metrics
+                'video_avg_time_watched': ad.video_avg_time_watched,
+                'video_p25_watched': ad.video_p25_watched,
+                'video_p50_watched': ad.video_p50_watched,
+                'video_p75_watched': ad.video_p75_watched,
+                'video_p100_watched': ad.video_p100_watched,
+                
+                # Quality rankings
+                'quality_ranking': ad.quality_ranking,
+                'engagement_rate_ranking': ad.engagement_rate_ranking,
+                'conversion_rate_ranking': ad.conversion_rate_ranking,
+                
+                # Complex data
+                'actions_data': ad.actions_data,
+                'conversions_data': ad.conversions_data,
+                'targeting_data': ad.targeting_data,
+                'tracking_specs': ad.tracking_specs,
+                'conversion_specs': ad.conversion_specs,
+                'promoted_object': ad.promoted_object,
+                
+                # Timestamps
+                'created_time': ad.created_time.isoformat() if ad.created_time else None,
+                'updated_time': ad.updated_time.isoformat() if ad.updated_time else None,
+                'last_synced': ad.last_synced.isoformat(),
+            })
+        
+        return Response({
+            'success': True,
+            'ads': ads_data,
+            'total_count': len(ads_data),
+            'limit_applied': limit
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in get_comprehensive_ads_data: {str(e)}")
         return Response({
             'success': False,
             'message': f'An error occurred: {str(e)}'

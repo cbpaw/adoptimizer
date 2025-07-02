@@ -32,6 +32,13 @@ export default defineConfig({
         'pegasus': path.resolve(__dirname, './assets/javascript/pegasus/pegasus.js'),
         'react-object-lifecycle': path.resolve(__dirname, './assets/javascript/pegasus/examples/react/react-object-lifecycle.jsx'),
         'vue-object-lifecycle': path.resolve(__dirname, './assets/javascript/pegasus/examples/vue/vue-object-lifecycle.js'),
+        // Add our new modular JavaScript files
+        'notification-system': path.resolve(__dirname, './assets/javascript/notification-system.js'),
+        'campaign-sync-manager': path.resolve(__dirname, './assets/javascript/campaign-sync-manager.js'),
+        'campaign-selection': path.resolve(__dirname, './assets/javascript/campaign-selection.js'),
+        'facebook-settings': path.resolve(__dirname, './assets/javascript/facebook-settings.js'),
+        'campaign-detail': path.resolve(__dirname, './assets/javascript/campaign-detail.js'),
+        'comprehensive-data-display': path.resolve(__dirname, './assets/javascript/comprehensive-data-display.js'),
       },
       output: {
         // Output JS bundles to js/ directory with -bundle suffix

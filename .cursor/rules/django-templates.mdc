@@ -1,9 +1,16 @@
 ---
-description: Guidelines for working with Django templates and HTML files
-globs: *.html
+description: 
+globs: 
 alwaysApply: false
 ---
 ## Django Template Coding Guidelines for HTML files
+
+- Indent templates with two spaces.
+- Use standard Django template syntax.
+- Use translation markup, usually `translate` or `blocktranslate trimmed` with user-facing text.
+# Django Template Guidelines
+
+## Template Structure and Syntax
 
 - Indent templates with two spaces.
 - Use standard Django template syntax.
@@ -14,5 +21,20 @@ alwaysApply: false
 - Use the Django `{% static %}` tag for loading images and external JavaScript / CSS files not managed by vite.
 - Break re-usable template components into separate templates with `{% include %}` statements.
   These normally go into a `components` folder.
-- Use DaisyUI styling markup for available components. When not available, fall back to standard TailwindCSS classes.
-- Stick with the DaisyUI color palette whenever possible.
+
+## UI Components
+
+- **ALWAYS use ShadCN UI components** for all UI elements
+- Never use DaisyUI or custom TailwindCSS classes without ShadCN UI
+- Follow ShadCN UI component patterns and styling exactly
+- Use ShadCN UI color schemes and design tokens consistently
+
+### Date and Time Display
+
+- **Always use user-aware timezone display** for dates and times.
+- Load timezone template tags: `{% load tz %}`
+- Use `|localtime` filter for datetime fields: `{{ some_datetime|localtime|date:"d-m-Y H:i" }}`
+- **NEVER hardcode timezone names** like `{% timezone "Europe/Amsterdam" %}` - let Django's timezone middleware handle user timezones automatically.
+- Use appropriate date formats for the target audience (e.g., "d-m-Y H:i" for European format).
+- The middleware `UserTimezoneMiddleware` automatically activates the user's timezone, or defaults to Europe/Amsterdam if not set.
+- Users can set their timezone in their profile settings (available timezone options are in `apps/utils/timezones.py`).

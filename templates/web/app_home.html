@@ -2,584 +2,421 @@
 {% load i18n %}
 {% load static %}
 {% load django_vite %}
+{% load humanize %}
+
+
+<!-- CSRF Token for JavaScript -->
+<form style="display: none;">
+    {% csrf_token %}
+</form>
 
 {% block app %}
-<div class="space-y-6">
-    <!-- Campaign Header Card -->
-    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
-        <div class="flex flex-col gap-1.5 px-6" data-slot="card-header">
-            <div class="flex justify-between items-center">
-                <div>
-                    <div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                        <span>Campaign Name</span>
-                        <i class="fa fa-chevron-right text-xs"></i>
-                        <span>Campaign Name</span>
-                        <span class="ml-auto text-xs">Updated 2m ago</span>
-                        <div class="flex items-center gap-1 ml-2">
-                            <i class="fa fa-camera text-muted-foreground"></i>
-                            <i class="fa fa-clock text-muted-foreground"></i>
-                        </div>
-                    </div>
-                </div>
+<div class="flex-1 space-y-4 p-8 pt-6">
+    <!-- Dashboard Header -->
+    <div class="flex items-center justify-between space-y-2">
+        <h2 class="text-3xl font-bold tracking-tight">{% translate "Campaign Dashboard" %}</h2>
+        <div class="flex items-center space-x-2">
+            <button onclick="syncComprehensiveData()" 
+                    class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {% translate "Sync Comprehensive Data" %}
+            </button>
+            <a href="{% url 'facebook_ads:campaign_selection' %}" 
+               class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+                {% translate "Beheer Campagnes" %}
+            </a>
+        </div>
+    </div>
+
+    <!-- Overview Cards with Enhanced Metrics -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <!-- Total Spend Card -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">{% translate "Totale Uitgaven" %}</h3>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+            </div>
+            <div class="p-6 pt-0">
+                <div class="text-2xl font-bold" id="total-spend">€{{ overall_stats.total_spend|floatformat:2 }}</div>
+                <p class="text-xs text-muted-foreground" id="total-campaigns">{{ overall_stats.active_campaigns }} campagne(s)</p>
             </div>
         </div>
-        
-        <!-- Campaign Metrics Cards -->
-        <div class="px-6" data-slot="card-content">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <!-- Total Spend Card -->
-                <div class="bg-card text-card-foreground flex flex-col gap-4 rounded-xl border p-4 shadow-sm" data-slot="card">
-                    <div class="flex flex-col gap-1">
-                        <div class="text-sm text-muted-foreground">Total Spend</div>
-                        <div class="text-2xl font-bold">48 h</div>
-                        <div class="h-2 bg-gray-200 rounded-full mt-2">
-                            <div class="h-2 bg-blue-500 rounded-full w-3/4"></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Avg CPC Card -->
-                <div class="bg-card text-card-foreground flex flex-col gap-4 rounded-xl border p-4 shadow-sm" data-slot="card">
-                    <div class="flex flex-col gap-1">
-                        <div class="text-sm text-muted-foreground">Avg CPC</div>
-                        <div class="flex items-center gap-2">
-                            <svg class="w-12 h-6" viewBox="0 0 48 24">
-                                <path d="M2 12 L8 8 L14 16 L20 6 L26 14 L32 4 L38 10 L44 2" stroke="#6366f1" stroke-width="2" fill="none"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- ATC Card -->
-                <div class="bg-card text-card-foreground flex flex-col gap-4 rounded-xl border p-4 shadow-sm" data-slot="card">
-                    <div class="flex flex-col gap-1">
-                        <div class="text-sm text-muted-foreground">ATC</div>
-                        <div class="text-2xl font-bold">0,14</div>
-                    </div>
-                </div>
-                
-                <!-- Purchases Card -->
-                <div class="bg-card text-card-foreground flex flex-col gap-4 rounded-xl border p-4 shadow-sm" data-slot="card">
-                    <div class="flex flex-col gap-1">
-                        <div class="text-sm text-muted-foreground">Purchases</div>
-                        <div class="text-2xl font-bold">Avg <span class="text-sm font-normal text-muted-foreground">ROAS</span></div>
-                        <div class="text-sm text-muted-foreground">(48 h)</div>
-                    </div>
-                </div>
+
+        <!-- Total Impressions Card -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">{% translate "Totale Impressies" %}</h3>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
             </div>
-            
-            <!-- Alert Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <!-- Campaign X Alert -->
-                <div class="border-l-4 border-orange-400 bg-orange-50 p-4 rounded-md" data-slot="alert">
-                    <div class="flex items-center gap-2">
-                        <i class="fa fa-exclamation-triangle text-orange-600"></i>
-                        <div>
-                            <div class="font-medium text-orange-800">Campaign X underperforming</div>
-                            <div class="text-sm text-orange-700">ROAS × threshold</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Budget Alert -->
-                <div class="border-l-4 border-yellow-400 bg-yellow-50 p-4 rounded-md" data-slot="alert">
-                    <div class="flex items-center gap-2">
-                        <i class="fa fa-exclamation-circle text-yellow-600"></i>
-                        <div>
-                            <div class="font-medium text-yellow-800">Budget exhausted</div>
-                            <div class="text-sm text-yellow-700">current spend</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="p-6 pt-0">
+                <div class="text-2xl font-bold" id="total-impressions">{{ overall_stats.total_impressions|intcomma }}</div>
+                <p class="text-xs text-muted-foreground">{% translate "Bereik uitgebreid" %}</p>
+            </div>
+        </div>
+
+        <!-- Total Clicks Card -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">{% translate "Totale Clicks" %}</h3>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                </svg>
+            </div>
+            <div class="p-6 pt-0">
+                <div class="text-2xl font-bold" id="total-clicks">{{ overall_stats.total_clicks|intcomma }}</div>
+                <p class="text-xs text-muted-foreground">{% translate "Alle campagnes" %}</p>
+            </div>
+        </div>
+
+        <!-- Average CPC Card -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">{% translate "Gem. CPC" %}</h3>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <div class="p-6 pt-0">
+                <div class="text-2xl font-bold" id="avg-cpc">€{{ overall_stats.avg_cpc|floatformat:3 }}</div>
+                <p class="text-xs text-muted-foreground">{% translate "Gemiddeld" %}</p>
+            </div>
+        </div>
+
+        <!-- Average ROAS Card -->
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6 flex flex-row items-center justify-between space-y-0 pb-2">
+                <h3 class="tracking-tight text-sm font-medium">{% translate "Gem. ROAS" %}</h3>
+                <svg class="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
+            <div class="p-6 pt-0">
+                <div class="text-2xl font-bold" id="avg-roas">{{ overall_stats.avg_roas|floatformat:2 }}x</div>
+                <p class="text-xs text-muted-foreground">{% translate "Purchase ROAS" %}</p>
             </div>
         </div>
     </div>
 
-    <!-- Campaign Filter Tabs -->
-    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
-        <div class="px-6" data-slot="card-content">
+    <!-- Comprehensive Data Loading State -->
+    <div id="loading-comprehensive" class="hidden rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="p-6 text-center">
+            <div class="flex items-center justify-center space-x-2">
+                <svg class="h-6 w-6 animate-spin text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span class="text-sm font-medium">{% translate "Syncing comprehensive campaign and ads data..." %}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if not campaign_stats %}
+    <!-- No Campaigns State -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="flex flex-col items-center justify-center p-6 text-center">
+            <div class="mb-4 rounded-full bg-muted p-4">
+                <svg class="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                </svg>
+            </div>
+            <h3 class="mb-2 text-lg font-semibold">{% translate "Geen Campagnes Geselecteerd" %}</h3>
+            <p class="mb-4 text-sm text-muted-foreground max-w-sm">
+                {% translate "Selecteer campagnes om hun prestaties te monitoren en gedetailleerde statistieken te bekijken." %}
+            </p>
+            <a href="{% url 'facebook_ads:campaign_selection' %}" 
+               class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                {% translate "Selecteer Campagnes" %}
+            </a>
+        </div>
+    </div>
+    {% else %}
+
+    <!-- Performance Alerts -->
+    {% for stat in campaign_stats %}
+        {% if stat.roas < 1.0 %}
+            <div class="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-orange-800">{{ stat.campaign.campaign_name }} prestaties laag</h3>
+                        <div class="mt-2 text-sm text-orange-700">
+                            <p>ROAS: {{ stat.roas }}x (onder drempelwaarde)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% elif stat.total_spend > 1000 %}
+            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-yellow-800">{{ stat.campaign.campaign_name }} hoge uitgaven</h3>
+                        <div class="mt-2 text-sm text-yellow-700">
+                            <p>€{{ stat.total_spend|floatformat:2 }} uitgegeven</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    <!-- Data View Toggle -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-4">
+                    <label for="data-view-toggle" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        {% translate "Data weergave:" %}
+                    </label>
+                    <select id="data-view-toggle" onchange="changeDataView(this.value)" 
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <option value="basic">{% translate "Basis weergave" %}</option>
+                        <option value="comprehensive">{% translate "Uitgebreide weergave" %}</option>
+                        <option value="ads">{% translate "Ad Details" %}</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <label for="campaign-type-filter" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        {% translate "Toon campagnes:" %}
+                    </label>
+                    <select id="campaign-type-filter" onchange="changeCampaignFilter(this.value)" 
+                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                        <option value="active" {% if current_filter == 'active' %}selected{% endif %}>
+                            {% translate "Alleen actieve campagnes" %}
+                        </option>
+                        <option value="selected" {% if current_filter == 'selected' %}selected{% endif %}>
+                            {% translate "Alleen geselecteerde campagnes" %} ({{ selected_campaigns_count }})
+                        </option>
+                        <option value="all" {% if current_filter == 'all' %}selected{% endif %}>
+                            {% translate "Alle campagnes" %}
+                        </option>
+                    </select>
+                </div>
+                
+                {% if current_filter == 'selected' %}
+                    <a href="{% url 'facebook_ads:campaign_selection' %}" 
+                       class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                        <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {% translate "Selectie aanpassen" %}
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Basic Campaign View (default) -->
+    <div id="basic-view" class="rounded-lg border bg-card text-card-foreground shadow-sm">
+        <div class="p-6">
             <!-- Filter Buttons -->
-            <div class="flex flex-wrap gap-2 mb-4">
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
-                    Learning
+            <div class="mb-4 flex flex-wrap gap-2">
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80 filter-btn" data-status="all">
+                    {% translate "Alle" %} ({{ campaign_stats|length }})
                 </button>
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-gray-100 text-gray-800" data-slot="badge">
-                    Lemming
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 filter-btn" data-status="high-perf">
+                    {% translate "High-Perf" %}
                 </button>
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800" data-slot="badge">
-                    Running
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 filter-btn" data-status="running">
+                    {% translate "Running" %}
                 </button>
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-purple-100 text-purple-800" data-slot="badge">
-                    High-Perf
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 filter-btn" data-status="learning">
+                    {% translate "Learning" %}
                 </button>
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-orange-100 text-orange-800" data-slot="badge">
-                    Scaling
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 filter-btn" data-status="under-perf">
+                    {% translate "Under-Perf" %}
                 </button>
-                <button class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-red-100 text-red-800" data-slot="badge">
-                    Under-Perf
+                <button class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 filter-btn" data-status="paused">
+                    {% translate "Paused" %}
                 </button>
             </div>
             
-            <!-- Search and Sort Controls -->
-            <div class="flex justify-between items-center mb-4">
-                <div class="flex items-center gap-4">
-                    <span class="text-sm text-muted-foreground">Columns</span>
-                    <span class="text-sm text-muted-foreground">Sort</span>
-                    <div class="relative">
-                        <input type="text" placeholder="Search" class="pl-8 pr-4 py-2 border border-input rounded-md text-sm">
-                        <i class="fa fa-search absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
-                    </div>
+            <!-- Search and Count -->
+            <div class="flex items-center justify-between mb-4">
+                <div class="relative">
+                    <svg class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input type="text" id="search-campaigns" placeholder="{% translate 'Zoek campagnes...' %}" 
+                           class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pl-8 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                 </div>
-                <button class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button">
-                    <i class="fa fa-sort"></i>
-                    Sort
-                </button>
+                <p class="text-sm text-muted-foreground" id="campaign-count">{{ campaign_stats|length }} campagne(s)</p>
             </div>
-        </div>
-    </div>
 
-    <!-- Campaigns Table -->
-    <div class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm" data-slot="card">
-        <div class="px-6" data-slot="card-content">
-            <div class="overflow-x-auto">
-                <table class="w-full caption-bottom text-sm" data-slot="table">
-                    <thead class="[&_tr]:border-b" data-slot="table-header">
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                Campaign
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                Sparkline
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                ROAS (48h)
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                Spend
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                CPC
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                ATC
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                Purch
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                Budget Remaining
-                            </th>
-                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0" data-slot="table-head">
-                                
-                            </th>
+            <!-- Campaigns Table -->
+            <div class="relative w-full overflow-auto">
+                <table class="w-full caption-bottom text-sm">
+                    <thead class="[&_tr]:border-b">
+                        <tr class="border-b transition-colors hover:bg-muted/50">
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Campagne" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "ROAS" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Uitgaven" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Clicks" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Impressies" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "CPC" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "CTR" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Ads" %}</th>
+                            <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{% translate "Acties" %}</th>
                         </tr>
                     </thead>
-                    <tbody class="[&_tr:last-child]:border-0" data-slot="table-body">
-                        <!-- Running Campaign -->
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800" data-slot="badge">
-                                        Running
+                    <tbody class="[&_tr:last-child]:border-0" id="campaigns-table-body">
+                        {% for stat in campaign_stats %}
+                        <tr class="border-b transition-colors hover:bg-muted/50 campaign-row" 
+                            data-status="{{ stat.status_badge.text|lower }}"
+                            data-campaign-name="{{ stat.campaign.campaign_name|lower }}">
+                            <td class="p-4 align-middle">
+                                <div class="flex items-center space-x-3">
+                                    <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 {% if stat.status_badge.text == 'High-Perf' %}border-transparent bg-green-100 text-green-800{% elif stat.status_badge.text == 'Running' %}border-transparent bg-blue-100 text-blue-800{% elif stat.status_badge.text == 'Learning' %}border-transparent bg-yellow-100 text-yellow-800{% elif stat.status_badge.text == 'Under-Perf' %}border-transparent bg-red-100 text-red-800{% else %}border-transparent bg-secondary text-secondary-foreground{% endif %}">
+                                        {{ stat.status_badge.text }}
                                     </span>
-                                    <span class="font-medium">Campaign Name</span>
+                                    <div>
+                                        <div class="font-medium">{{ stat.campaign.campaign_name }}</div>
+                                        <div class="text-sm text-muted-foreground">{{ stat.campaign.ad_account.ad_account_name }}</div>
+                                    </div>
                                 </div>
                             </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <svg class="w-16 h-8" viewBox="0 0 64 32">
-                                    <path d="M2 16 L8 12 L14 20 L20 8 L26 18 L32 6 L38 14 L44 4 L50 12 L56 8 L62 16" stroke="#22c55e" stroke-width="2" fill="none"/>
-                                </svg>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="font-medium">$7,49</div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,13
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                27
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="w-24 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-blue-600 h-2 rounded-full w-3/4"></div>
+                            <td class="p-4 align-middle">
+                                <div class="font-medium {% if stat.roas >= 3.0 %}text-green-600{% elif stat.roas >= 2.0 %}text-blue-600{% elif stat.roas >= 1.0 %}text-yellow-600{% else %}text-red-600{% endif %}">
+                                    {{ stat.roas }}x
                                 </div>
                             </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <button class="p-1 hover:bg-gray-100 rounded">
-                                    <i class="fa fa-ellipsis-h text-muted-foreground"></i>
-                                </button>
+                            <td class="p-4 align-middle font-medium">€{{ stat.total_spend|floatformat:2 }}</td>
+                            <td class="p-4 align-middle">{{ stat.total_clicks|intcomma }}</td>
+                            <td class="p-4 align-middle">{{ stat.total_impressions|intcomma }}</td>
+                            <td class="p-4 align-middle">€{{ stat.avg_cpc|floatformat:3 }}</td>
+                            <td class="p-4 align-middle">{{ stat.avg_ctr|floatformat:2 }}%</td>
+                            <td class="p-4 align-middle">
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground">
+                                    {{ stat.ad_count }}
+                                </span>
+                            </td>
+                            <td class="p-4 align-middle">
+                                <div class="flex items-center space-x-2">
+                                    <a href="{% url 'facebook_ads:campaign_detail' stat.campaign.id %}" 
+                                       class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                                       title="{% translate 'Details bekijken' %}">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </a>
+                                    <button onclick="toggleCampaign('{{ stat.campaign.campaign_id }}', '{{ stat.campaign.status|lower }}', '{{ stat.campaign.campaign_name }}')"
+                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                                            title="{% if stat.campaign.status == 'ACTIVE' %}{% translate 'Campagne pauzeren' %}{% else %}{% translate 'Campagne hervatten' %}{% endif %}">
+                                        {% if stat.campaign.status == "ACTIVE" %}
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        {% else %}
+                                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-7 0h6" />
+                                            </svg>
+                                        {% endif %}
+                                    </button>
+                                </div>
                             </td>
                         </tr>
-                        
-                        <!-- Learning Campaign -->
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800" data-slot="badge">
-                                        Learning
-                                    </span>
-                                    <span class="font-medium">Campaign</span>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <svg class="w-16 h-8" viewBox="0 0 64 32">
-                                    <path d="M2 20 L8 18 L14 22 L20 16 L26 24 L32 14 L38 20 L44 12 L50 18 L56 10 L62 14" stroke="#3b82f6" stroke-width="2" fill="none"/>
-                                </svg>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="font-medium">2,45 M</div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                $ 9,3
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,28
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                2,5
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                21
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="w-24 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-green-600 h-2 rounded-full w-1/2"></div>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <button class="p-1 hover:bg-gray-100 rounded">
-                                    <i class="fa fa-external-link text-muted-foreground"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <!-- Under-performing Campaign -->
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800" data-slot="badge">
-                                        Under-Perf
-                                    </span>
-                                    <span class="font-medium">Campaign Name</span>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <svg class="w-16 h-8" viewBox="0 0 64 32">
-                                    <path d="M2 12 L8 14 L14 16 L20 18 L26 20 L32 22 L38 24 L44 26 L50 28 L56 30 L62 28" stroke="#ef4444" stroke-width="2" fill="none"/>
-                                </svg>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="font-medium">0,31 g</div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                15 x
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,25
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                93
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                24
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="w-24 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-gray-600 h-2 rounded-full w-1/3"></div>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <button class="p-1 hover:bg-gray-100 rounded">
-                                    <i class="fa fa-external-link text-muted-foreground"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <!-- Campaign X -->
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800" data-slot="badge">
-                                        Scaling
-                                    </span>
-                                    <span class="font-medium">Campaign X</span>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <svg class="w-16 h-8" viewBox="0 0 64 32">
-                                    <path d="M2 28 L8 26 L14 24 L20 22 L26 20 L32 18 L38 16 L44 14 L50 12 L56 10 L62 8" stroke="#f97316" stroke-width="2" fill="none"/>
-                                </svg>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="font-medium">1,53g</div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,14
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,32
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                18
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                23
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="w-24 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-orange-600 h-2 rounded-full w-5/6"></div>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <button class="p-1 hover:bg-gray-100 rounded">
-                                    <i class="fa fa-external-link text-muted-foreground"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        
-                        <!-- Bugger C -->
-                        <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted" data-slot="table-row">
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800" data-slot="badge">
-                                        Lemming
-                                    </span>
-                                    <span class="font-medium">Bugger C</span>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <svg class="w-16 h-8" viewBox="0 0 64 32">
-                                    <path d="M2 16 L62 16" stroke="#6b7280" stroke-width="2" fill="none"/>
-                                </svg>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="font-medium">72 %</div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                322 m
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                0,62
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                36
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                23
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <div class="w-24 bg-gray-200 rounded-full h-2">
-                                    <div class="bg-gray-600 h-2 rounded-full w-2/3"></div>
-                                </div>
-                            </td>
-                            <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0" data-slot="table-cell">
-                                <button class="p-1 hover:bg-gray-100 rounded">
-                                    <i class="fa fa-circle text-muted-foreground"></i>
-                                </button>
-                            </td>
-                        </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Quick Action Buttons -->
-    <div class="flex justify-between items-center">
-        <div class="flex gap-2">
-            {% if not facebook_accounts %}
-                <button onclick="showFacebookSetup()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2" data-slot="button">
-                    {% translate "Connect Facebook Account" %}
-                </button>
-            {% else %}
-                <button onclick="syncFacebookAds()" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button" id="sync-ads-btn">
-                    {% translate "Sync Campaigns" %}
-                </button>
-                <a href="{% url 'facebook_ads:campaign_selection' %}" class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" data-slot="button">
-                    <i class="fa fa-bullhorn mr-1"></i>
-                    {% translate "Manage Campaigns" %}
-                </a>
-            {% endif %}
+    <!-- Comprehensive Campaign View -->
+    <div id="comprehensive-view" class="hidden">
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold mb-4">{% translate "Uitgebreide Campagne Data" %}</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full caption-bottom text-sm">
+                        <thead class="[&_tr]:border-b">
+                            <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Campagne</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Budget Info</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Performance</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Advanced Metrics</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Conversions</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Acties</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comprehensive-campaigns-table" class="[&_tr:last-child]:border-0">
+                            <!-- Comprehensive campaign data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Comprehensive Ads View -->
+    <div id="ads-view" class="hidden">
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold mb-4">{% translate "Uitgebreide Ad Data" %}</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full caption-bottom text-sm">
+                        <thead class="[&_tr]:border-b">
+                            <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ad Info</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Creative</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Performance</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Video Metrics</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Quality</th>
+                                <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Targeting</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comprehensive-ads-table" class="[&_tr:last-child]:border-0">
+                            <!-- Comprehensive ads data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
 </div>
 
-<!-- Include ShadCN styles and JavaScript functionality -->
-{{ facebook_accounts|json_script:'facebook-accounts' }}
-{{ show_facebook_setup_modal|json_script:'show-facebook-setup-modal' }}
+<!-- Load comprehensive data display JavaScript -->
+{% vite_asset 'assets/javascript/comprehensive-data-display.js' %}
 
+<!-- Pass Facebook accounts data to JavaScript -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-show Facebook setup modal if no accounts are connected
-    const showSetupModal = JSON.parse(document.getElementById('show-facebook-setup-modal').textContent);
-    if (showSetupModal) {
-        setTimeout(() => {
-            showFacebookSetup();
-        }, 1000);
-    }
+    // Make Facebook accounts available to the comprehensive data display module
+    window.facebookAccounts = {{ facebook_accounts|safe }};
     
-    // Add interactivity to filter badges
-    const filterBadges = document.querySelectorAll('[data-slot="badge"]');
-    filterBadges.forEach(badge => {
-        badge.addEventListener('click', function() {
-            // Toggle active state
-            this.classList.toggle('ring-2');
-            this.classList.toggle('ring-blue-500');
-        });
-    });
-});
-
-function showFacebookSetup() {
-    resetModal();
-    document.getElementById('facebook-setup-modal').showModal();
-}
-
-function syncFacebookAds() {
-    const btn = document.getElementById('sync-ads-btn');
-    if (!btn) return;
-    
-    const originalText = btn.textContent;
-    btn.textContent = 'Syncing...';
-    btn.disabled = true;
-
-    const facebookAccounts = JSON.parse(document.getElementById('facebook-accounts').textContent);
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-    
-    if (facebookAccounts && facebookAccounts.length > 0) {
-        const accountId = facebookAccounts[0].id;
-        
-        fetch(`/facebook-ads/accounts/${accountId}/sync/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken,
-                'Content-Type': 'application/json',
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert(`Successfully synced ${data.synced_count} campaigns!`);
-                location.reload();
-            } else {
-                alert(`Error: ${data.message}`);
+    // Simple toggle function for existing campaign management
+    window.toggleCampaign = function(campaignId) {
+        if (confirm('Weet je zeker dat je deze campagne wilt pauzeren?')) {
+            console.log('Pausing campaign:', campaignId);
+            if (window.showSuccess) {
+                window.showSuccess('Campagne wordt gepauzeerd...');
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while syncing campaigns.');
-        })
-        .finally(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        });
-    } else {
-        alert('No Facebook accounts found.');
-        btn.textContent = originalText;
-        btn.disabled = false;
-    }
-}
+        }
+    };
 </script>
 
-<!-- Facebook Setup Modal -->
-<dialog id="facebook-setup-modal" class="modal">
-  <div class="modal-box w-11/12 max-w-2xl">
-    <!-- Hidden form for CSRF token -->
-    <form style="display: none;">
-      {% csrf_token %}
-    </form>
-    
-    <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
-    </form>
-    
-    <h3 class="font-bold text-lg mb-4">Facebook Ad Account Toevoegen</h3>
-    
-    <!-- Step 1: App ID Input -->
-    <div id="step-app-id" class="step-content">
-      <div class="mb-4">
-        <label class="label">
-          <span class="label-text">Facebook App ID</span>
-        </label>
-        <input type="text" id="facebook-app-id" class="input input-bordered w-full" placeholder="Voer uw Facebook App ID in">
-        <div class="label">
-          <span class="label-text-alt">U vindt dit in uw Facebook Developer Console</span>
-        </div>
-      </div>
-      <div class="modal-action">
-        <button onclick="proceedToTokenStep()" class="btn btn-primary">Volgende</button>
-        <button onclick="closeModal()" class="btn">Annuleren</button>
-      </div>
-    </div>
-    
-    <!-- Step 2: Token Generation -->
-    <div id="step-token" class="step-content hidden">
-      <div class="mb-4">
-        <p class="mb-3">Volg deze stappen om uw access token te genereren:</p>
-        <ol class="list-decimal list-inside space-y-2 mb-4">
-          <li>Klik op onderstaande link om Facebook Graph API Explorer te openen</li>
-          <li>Selecteer uw app en genereer een access token</li>
-          <li>Kopieer de token en plak deze in het veld hieronder</li>
-        </ol>
-        <a id="graph-explorer-link" href="#" target="_blank" class="btn btn-outline mb-4">
-          <i class="fa fa-external-link"></i>
-          Open Graph API Explorer
-        </a>
-        
-        <label class="label">
-          <span class="label-text">Access Token</span>
-        </label>
-        <textarea id="facebook-token" class="textarea textarea-bordered w-full h-20" placeholder="Plak uw access token hier"></textarea>
-      </div>
-      <div class="modal-action">
-        <button onclick="fetchAdAccounts()" class="btn btn-primary" id="fetch-accounts-btn">Haal Ad Accounts Op</button>
-        <button onclick="backToAppIdStep()" class="btn btn-ghost">Terug</button>
-      </div>
-    </div>
-    
-    <!-- Step 3: Account Selection -->
-    <div id="step-accounts" class="step-content hidden">
-      <div class="mb-4">
-        <h4 class="font-semibold mb-3">Selecteer Ad Account</h4>
-        <div id="ad-accounts-list" class="space-y-2 max-h-60 overflow-y-auto">
-          <!-- Ad accounts will be populated here -->
-        </div>
-      </div>
-      <div class="modal-action">
-        <button onclick="connectSelectedAccount()" class="btn btn-primary" id="connect-account-btn" disabled>Account Koppelen</button>
-        <button onclick="backToTokenStep()" class="btn btn-ghost">Terug</button>
-      </div>
-    </div>
-    
-    <!-- Loading state -->
-    <div id="loading-state" class="step-content hidden text-center py-8">
-      <span class="loading loading-spinner loading-lg"></span>
-      <p class="mt-4">Bezig met laden...</p>
-    </div>
-    
-    <!-- Success state -->
-    <div id="success-state" class="step-content hidden text-center py-8">
-      <div class="text-green-500 text-4xl mb-4">
-        <i class="fas fa-check-circle"></i>
-      </div>
-      <h4 class="font-semibold text-lg mb-2">Account Succesvol Gekoppeld!</h4>
-      <p class="text-gray-600 mb-4">Uw Facebook Ad Account is succesvol gekoppeld.</p>
-      <button onclick="location.reload()" class="btn btn-primary">Dashboard Herladen</button>
-    </div>
-    
-    <!-- Error state -->
-    <div id="error-state" class="step-content hidden text-center py-8">
-      <div class="text-red-500 text-4xl mb-4">
-        <i class="fas fa-exclamation-triangle"></i>
-      </div>
-      <h4 class="font-semibold text-lg mb-2">Er is een fout opgetreden</h4>
-      <p class="text-gray-600 mb-4" id="error-message">Er is een probleem opgetreden bij het koppelen van uw account.</p>
-      <div class="space-x-2">
-        <button onclick="resetModal()" class="btn btn-ghost">Opnieuw Proberen</button>
-        <button onclick="closeModal()" class="btn">Sluiten</button>
-      </div>
-    </div>
-  </div>
-</dialog>
-
-<script src="{% static 'facebook_ads/js/facebook_setup.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,1174 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AdOptimizer API",
+    "version": "1.0.0",
+    "description": "Complete API documentation for AdOptimizer - Save costs on your Ad spend with powerful Facebook advertising optimization tools.",
+    "contact": {
+      "name": "AdOptimizer API Support",
+      "email": "support@adoptimizer.com"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "paths": {
+    "/api/v1/facebook/token/revoke/": {
+      "post": {
+        "operationId": "api_v1_facebook_token_revoke_create",
+        "description": "\n        Deactivate the user's Facebook access token.\n\n        This endpoint:\n        1. Marks the token as inactive\n        2. Prevents future API calls\n        3. Maintains record for audit purposes\n        ",
+        "summary": "Revoke Facebook Token",
+        "tags": [
+          "Facebook API"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenRevokeResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/facebook/token/status/": {
+      "get": {
+        "operationId": "api_v1_facebook_token_status_retrieve",
+        "description": "Retrieve the current Facebook token status for the authenticated user",
+        "summary": "Get Facebook Token Status",
+        "tags": [
+          "Facebook API"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/api/v1/facebook/token/validate/": {
+      "post": {
+        "operationId": "api_v1_facebook_token_validate_create",
+        "description": "\n        Validate a Facebook access token with Facebook's API and save it securely.\n\n        This endpoint:\n        1. Validates the token with Facebook Graph API\n        2. Retrieves user information and permissions\n        3. Stores the token for future API calls\n        4. Returns comprehensive token information\n        ",
+        "summary": "Validate and Save Facebook Token",
+        "tags": [
+          "Facebook API"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenValidationResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/dashboard/api/user-signups/": {
+      "get": {
+        "operationId": "dashboard_api_user_signups_list",
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSignupStats"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/facebook/api/v1/token/revoke/": {
+      "post": {
+        "operationId": "facebook_api_v1_token_revoke_create",
+        "description": "\n        Revoke/deactivate the Facebook access token for the authenticated user.\n\n        This endpoint:\n        1. Marks the user's Facebook token as inactive\n        2. Prevents future API calls using the token\n        3. Maintains token record for audit purposes\n        ",
+        "summary": "Revoke Facebook Token",
+        "tags": [
+          "Facebook Authentication"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenRevokeResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/facebook/api/v1/token/status/": {
+      "get": {
+        "operationId": "facebook_api_v1_token_status_retrieve",
+        "description": "Retrieve the current Facebook token status for the authenticated user",
+        "summary": "Get Facebook Token Status",
+        "tags": [
+          "Facebook Authentication"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenStatus"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/facebook/api/v1/token/validate/": {
+      "post": {
+        "operationId": "facebook_api_v1_token_validate_create",
+        "description": "\n        Validate a Facebook access token with the Facebook Graph API and save it for the authenticated user.\n\n        This endpoint:\n        1. Validates the token with Facebook's API\n        2. Retrieves user information and permissions\n        3. Stores the token securely for future use\n        4. Returns comprehensive token information\n        ",
+        "summary": "Validate and Save Facebook Token",
+        "tags": [
+          "Facebook Authentication"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FacebookTokenValidation"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookTokenValidationResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/pegasus/employees/api/employee-data/": {
+      "get": {
+        "operationId": "employees_aggregate_data",
+        "tags": [
+          "pegasus"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AggregateEmployeeData"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/pegasus/employees/api/employees/": {
+      "get": {
+        "operationId": "employees_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "pegasus"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedEmployeeList"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "post": {
+        "operationId": "employees_create",
+        "tags": [
+          "pegasus"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Employee"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/pegasus/employees/api/employees/{id}/": {
+      "get": {
+        "operationId": "employees_retrieve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this employee.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "pegasus"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Employee"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "put": {
+        "operationId": "employees_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this employee.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "pegasus"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Employee"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Employee"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "patch": {
+        "operationId": "employees_partial_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this employee.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "pegasus"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEmployee"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEmployee"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEmployee"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Employee"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "operationId": "employees_destroy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this employee.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "pegasus"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No response body"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AggregateEmployeeData": {
+        "type": "object",
+        "properties": {
+          "total_costs": {},
+          "average_salaries": {},
+          "headcounts": {}
+        },
+        "required": [
+          "average_salaries",
+          "headcounts",
+          "total_costs"
+        ]
+      },
+      "Employee": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "user": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Your employee's name.",
+            "maxLength": 100
+          },
+          "department": {
+            "enum": [
+              "hr",
+              "finance",
+              "engineering",
+              "marketing",
+              "sales"
+            ],
+            "type": "string",
+            "description": "* `hr` - Human Resources\n* `finance` - Finance\n* `engineering` - Engineering\n* `marketing` - Marketing\n* `sales` - Sales",
+            "x-spec-enum-id": "38fc39278821aba5"
+          },
+          "salary": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": 0,
+            "description": "Your employee's annual salary."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "created_at",
+          "department",
+          "id",
+          "name",
+          "salary",
+          "updated_at",
+          "user"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Serializer for error responses.",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "details": {
+            "type": "string",
+            "nullable": true,
+            "description": "Additional error details"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "FacebookTokenRevokeResponse": {
+        "type": "object",
+        "description": "Serializer for Facebook token revocation response.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation was successful"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          }
+        },
+        "required": [
+          "message",
+          "success"
+        ]
+      },
+      "FacebookTokenStatus": {
+        "type": "object",
+        "description": "Serializer for Facebook token status response.",
+        "properties": {
+          "has_token": {
+            "type": "boolean",
+            "description": "Whether user has an active token"
+          },
+          "facebook_user_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Facebook user's display name"
+          },
+          "facebook_user_email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Facebook user's email address"
+          },
+          "facebook_user_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Facebook user ID"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "List of granted Facebook permissions"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "When token was last used"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Token expiration timestamp"
+          },
+          "token_expired": {
+            "type": "boolean",
+            "description": "Whether token has expired"
+          },
+          "token_expires_soon": {
+            "type": "boolean",
+            "description": "Whether token expires within 7 days"
+          }
+        },
+        "required": [
+          "has_token"
+        ]
+      },
+      "FacebookTokenValidation": {
+        "type": "object",
+        "description": "Serializer for Facebook token validation request.",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Facebook access token to validate and store",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "access_token"
+        ]
+      },
+      "FacebookTokenValidationResponse": {
+        "type": "object",
+        "description": "Serializer for Facebook token validation response.",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation was successful"
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          },
+          "user_info": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Facebook user information"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of granted Facebook permissions"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Token expiration timestamp"
+          },
+          "created": {
+            "type": "boolean",
+            "description": "Whether a new token was created"
+          },
+          "has_token": {
+            "type": "boolean",
+            "description": "Whether user has an active token"
+          },
+          "facebook_user_name": {
+            "type": "string",
+            "description": "Facebook user's display name"
+          },
+          "facebook_user_email": {
+            "type": "string",
+            "description": "Facebook user's email address"
+          },
+          "facebook_user_id": {
+            "type": "string",
+            "description": "Facebook user ID"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When token was last used"
+          },
+          "token_expired": {
+            "type": "boolean",
+            "description": "Whether token has expired"
+          },
+          "token_expires_soon": {
+            "type": "boolean",
+            "description": "Whether token expires within 7 days"
+          }
+        },
+        "required": [
+          "created",
+          "expires_at",
+          "facebook_user_email",
+          "facebook_user_id",
+          "facebook_user_name",
+          "has_token",
+          "last_used_at",
+          "message",
+          "scopes",
+          "success",
+          "token_expired",
+          "token_expires_soon",
+          "user_info"
+        ]
+      },
+      "PaginatedEmployeeList": {
+        "type": "object",
+        "required": [
+          "count",
+          "results"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "http://api.example.org/accounts/?page=2"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Employee"
+            }
+          }
+        }
+      },
+      "PatchedEmployee": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "user": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "description": "Your employee's name.",
+            "maxLength": 100
+          },
+          "department": {
+            "enum": [
+              "hr",
+              "finance",
+              "engineering",
+              "marketing",
+              "sales"
+            ],
+            "type": "string",
+            "description": "* `hr` - Human Resources\n* `finance` - Finance\n* `engineering` - Engineering\n* `marketing` - Marketing\n* `sales` - Sales",
+            "x-spec-enum-id": "38fc39278821aba5"
+          },
+          "salary": {
+            "type": "integer",
+            "maximum": 2147483647,
+            "minimum": 0,
+            "description": "Your employee's annual salary."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        }
+      },
+      "UserSignupStats": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "date"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "API Key authentication. Use format: 'Api-Key YOUR_API_KEY'"
+      },
+      "SessionAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid",
+        "description": "Django session authentication"
+      },
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionid"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Facebook Authentication",
+      "description": "Manage Facebook access tokens and authentication"
+    },
+    {
+      "name": "Facebook Integration",
+      "description": "Facebook API integration endpoints"
+    },
+    {
+      "name": "User Management",
+      "description": "User account and profile management"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Dashboard and analytics endpoints"
+    },
+    {
+      "name": "API",
+      "description": "General API endpoints"
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.adoptimizer.com",
+      "description": "Production server"
+    }
+  ]
+}

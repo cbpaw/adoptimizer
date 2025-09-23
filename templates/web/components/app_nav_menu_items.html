@@ -38,13 +38,22 @@
     </a>
   </li>
   <li>
-    <a href="{% url 'users:user_profile' %}" {% if active_tab == 'profile' %}class="menu-active"{% endif %}>
-      <i class="fa fa-user h-4 w-4"></i>
-      {% translate "Profile" %}
-    </a>
+    {% load facebook_auth_tags %}
+    {% get_facebook_token user as facebook_token %}
+    {% if facebook_token %}
+      <a href="{% url 'facebook_auth:user_detail' %}" {% if active_tab == 'profile' %}class="menu-active"{% endif %}>
+        <i class="fa fa-user h-4 w-4"></i>
+        {% translate "Profile" %}
+      </a>
+    {% else %}
+      <a href="{% url 'users:user_profile' %}" {% if active_tab == 'profile' %}class="menu-active"{% endif %}>
+        <i class="fa fa-user h-4 w-4"></i>
+        {% translate "Profile" %}
+      </a>
+    {% endif %}
   </li>
   <li>
-    <a href="{% url 'facebook_auth:settings' %}" {% if 'facebook' in request.path %}class="menu-active"{% endif %}>
+    <a href="{% url 'facebook_auth:settings' %}" {% if request.path == '/facebook/settings/' %}class="menu-active"{% endif %}>
       <i class="fa fa-cog h-4 w-4"></i>
       {% translate "Settings" %}
     </a>

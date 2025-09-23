@@ -59,14 +59,22 @@ function FacebookTokenStatus({ token, onUpdate, onRevoke }) {
       </Alert>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Facebook ID</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm font-mono">{token.facebook_user_id}</p>
-          </CardContent>
-        </Card>
+        <a
+          href="/facebook/user-detail/"
+          className="block transition-all duration-200 hover:scale-105"
+          title="Click to view detailed Facebook user information"
+        >
+          <Card className="cursor-pointer hover:shadow-md hover:border-blue-300 transition-all duration-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base text-blue-600">Facebook ID</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm font-mono text-blue-600 hover:text-blue-800">
+                {token.facebook_user_id}
+              </p>
+            </CardContent>
+          </Card>
+        </a>
 
         <Card>
           <CardHeader className="pb-2">
@@ -237,6 +245,10 @@ export function FacebookTokenSettings({ initialToken, csrfToken }) {
           'Token validated successfully!',
           `Connected to: ${data.user_info.name}`
         )
+        // Reload the page to update all components with new token data
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500) // Give user time to see the success message
       } else {
         notifications.error(
           'Validation Error',
@@ -275,6 +287,10 @@ export function FacebookTokenSettings({ initialToken, csrfToken }) {
           'Token Revoked',
           'Your Facebook token has been successfully revoked.'
         )
+        // Reload the page to update all components with revoked token state
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500) // Give user time to see the success message
       } else {
         notifications.error(
           'Revocation Error',

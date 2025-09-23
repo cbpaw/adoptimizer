@@ -191,6 +191,72 @@
         }
       }
     },
+    "/api/v1/facebook/user/details/": {
+      "get": {
+        "operationId": "api_v1_facebook_user_details_retrieve",
+        "description": "\n        Retrieve detailed information about the authenticated user's Facebook profile.\n\n        This endpoint:\n        1. Uses the stored Facebook token to fetch user details\n        2. Retrieves comprehensive profile information from Facebook\n        3. Returns structured user data for display\n        ",
+        "summary": "Get Facebook User Details",
+        "tags": [
+          "Facebook API"
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "basicAuth": []
+          },
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "SessionAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FacebookUserDetail"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
     "/dashboard/api/user-signups/": {
       "get": {
         "operationId": "dashboard_api_user_signups_list",
@@ -1019,6 +1085,75 @@
           "token_expired",
           "token_expires_soon",
           "user_info"
+        ]
+      },
+      "FacebookUserDetail": {
+        "type": "object",
+        "description": "Serializer for Facebook user detail response.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Facebook user ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "User's display name"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's email address"
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's first name"
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's last name"
+          },
+          "picture": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true,
+            "description": "User's profile picture data"
+          },
+          "locale": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's locale"
+          },
+          "timezone": {
+            "type": "integer",
+            "nullable": true,
+            "description": "User's timezone offset"
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's gender"
+          },
+          "age_range": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true,
+            "description": "User's age range"
+          },
+          "link": {
+            "type": "string",
+            "nullable": true,
+            "description": "Link to user's Facebook profile"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether the user is verified"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ]
       },
       "PaginatedEmployeeList": {

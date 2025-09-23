@@ -20,6 +20,7 @@ from apps.facebook_auth.serializers import (
     FacebookTokenStatusSerializer,
     FacebookTokenValidationResponseSerializer,
     FacebookTokenValidationSerializer,
+    FacebookUserDetailSerializer,
 )
 
 
@@ -229,5 +230,78 @@ class FacebookTokenRevokeView(APIView):
                 {
                     "error": "No Facebook token found for this user"
                 },
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        summary="Get Facebook User Details",
+        description="""
+        Retrieve detailed information about the authenticated user's Facebook profile.
+
+        This endpoint:
+        1. Uses the stored Facebook token to fetch user details
+        2. Retrieves comprehensive profile information from Facebook
+        3. Returns structured user data for display
+        """,
+        responses={
+            200: FacebookUserDetailSerializer,
+            401: ErrorResponseSerializer,
+            404: ErrorResponseSerializer,
+            400: ErrorResponseSerializer,
+        },
+        tags=["Facebook API"],
+    )
+)
+class FacebookUserDetailView(APIView):
+    """Get Facebook user details - pure JSON API endpoint."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Get detailed Facebook user information."""
+        try:
+            facebook_token = request.user.facebook_token
+
+            if not facebook_token.is_active:
+                return Response(
+                    {"error": "Facebook token is not active"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if facebook_token.is_expired:
+                return Response(
+                    {"error": "Facebook token has expired"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Use the Facebook API client
+            client = FacebookGraphClient(facebook_token.access_token)
+
+            try:
+                # Get detailed user information
+                user_data = client.get("me", params={
+                    "fields": "id,name,email,first_name,last_name,picture.width(200).height(200),locale,timezone,gender,age_range,link,verified"
+                })
+
+                # Update last used timestamp
+                facebook_token.last_used_at = timezone.now()
+                facebook_token.save(update_fields=["last_used_at"])
+
+                return Response(user_data)
+
+            except FacebookAPIError as e:
+                return Response(
+                    {
+                        "error": f"Failed to fetch user details: {e.message}",
+                        "details": f"Error code: {e.error_code}" if e.error_code else None,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        except FacebookToken.DoesNotExist:
+            return Response(
+                {"error": "No Facebook token found for this user"},
                 status=status.HTTP_404_NOT_FOUND
             )

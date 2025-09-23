@@ -6,6 +6,7 @@ app_name = "facebook_auth"
 urlpatterns = [
     # Settings page views
     path("settings/", views.facebook_settings, name="settings"),
+    path("user-detail/", views.facebook_user_detail, name="user_detail"),
 
     # Legacy API endpoints (for backward compatibility)
     path("api/validate-token/", views.validate_and_save_token, name="validate_token"),

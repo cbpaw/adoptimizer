@@ -158,3 +158,29 @@ def revoke_token(request):
         return JsonResponse({"error": "No token found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": "An unexpected error occurred", "details": str(e)}, status=500)
+
+
+@login_required
+def facebook_user_detail(request):
+    """Facebook user detail page."""
+    try:
+        facebook_token = request.user.facebook_token
+
+        if not facebook_token or not facebook_token.is_active:
+            return render(request, "facebook_auth/user_detail.html", {
+                "error": "No active Facebook token found. Please connect your Facebook account first.",
+                "facebook_token": None
+            })
+
+        context = {
+            "facebook_token": facebook_token,
+            "facebook_user_id": facebook_token.facebook_user_id,
+            "active_tab": "profile",
+        }
+        return render(request, "facebook_auth/user_detail.html", context)
+
+    except FacebookToken.DoesNotExist:
+        return render(request, "facebook_auth/user_detail.html", {
+            "error": "No Facebook token found. Please connect your Facebook account first.",
+            "facebook_token": None
+        })

@@ -88,6 +88,62 @@ class FacebookTokenRevokeResponseSerializer(serializers.Serializer):
     message = serializers.CharField(help_text="Success message")
 
 
+class FacebookUserDetailSerializer(serializers.Serializer):
+    """Serializer for Facebook user detail response."""
+
+    id = serializers.CharField(help_text="Facebook user ID")
+    name = serializers.CharField(help_text="User's display name")
+    email = serializers.CharField(
+        help_text="User's email address",
+        required=False,
+        allow_null=True
+    )
+    first_name = serializers.CharField(
+        help_text="User's first name",
+        required=False,
+        allow_null=True
+    )
+    last_name = serializers.CharField(
+        help_text="User's last name",
+        required=False,
+        allow_null=True
+    )
+    picture = serializers.DictField(
+        help_text="User's profile picture data",
+        required=False,
+        allow_null=True
+    )
+    locale = serializers.CharField(
+        help_text="User's locale",
+        required=False,
+        allow_null=True
+    )
+    timezone = serializers.IntegerField(
+        help_text="User's timezone offset",
+        required=False,
+        allow_null=True
+    )
+    gender = serializers.CharField(
+        help_text="User's gender",
+        required=False,
+        allow_null=True
+    )
+    age_range = serializers.DictField(
+        help_text="User's age range",
+        required=False,
+        allow_null=True
+    )
+    link = serializers.CharField(
+        help_text="Link to user's Facebook profile",
+        required=False,
+        allow_null=True
+    )
+    verified = serializers.BooleanField(
+        help_text="Whether the user is verified",
+        required=False
+    )
+
+
 class ErrorResponseSerializer(serializers.Serializer):
     """Serializer for error responses."""
 

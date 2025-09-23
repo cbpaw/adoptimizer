@@ -56,4 +56,5 @@ urlpatterns = [
     # hijack urls for impersonation
     path("hijack/", include("hijack.urls", namespace="hijack")),
     path("group-chat/", include("apps.group_chat.urls")),
+    path("facebook/", include("apps.facebook_auth.urls")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

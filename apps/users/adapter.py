@@ -5,6 +5,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.account.utils import user_email, user_field
 from allauth.headless.adapter import DefaultHeadlessAdapter
 from allauth.mfa.models import Authenticator
+from django.urls import reverse
 
 
 class EmailAsUsernameAdapter(DefaultAccountAdapter):
@@ -15,6 +16,12 @@ class EmailAsUsernameAdapter(DefaultAccountAdapter):
     def populate_username(self, request, user):
         # override the username population to always use the email
         user_field(user, app_settings.USER_MODEL_USERNAME_FIELD, user_email(user))
+
+    def get_signup_redirect_url(self, request):
+        """
+        Redirect new users to Facebook settings page after signup.
+        """
+        return reverse("facebook_auth:settings")
 
 
 class NoNewUsersAccountAdapter(DefaultAccountAdapter):

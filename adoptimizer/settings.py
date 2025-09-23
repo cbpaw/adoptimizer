@@ -87,6 +87,12 @@ PROJECT_APPS = [
     "apps.utils",
     "apps.web",
     "apps.group_chat",
+    # Facebook integration apps
+    "apps.facebook_auth.apps.FacebookAuthConfig",
+    "apps.facebook_accounts.apps.FacebookAccountsConfig",
+    "apps.facebook_ads.apps.FacebookAdsConfig",
+    "apps.facebook_insights.apps.FacebookInsightsConfig",
+    "apps.facebook_sync.apps.FacebookSyncConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PEGASUS_APPS + PROJECT_APPS

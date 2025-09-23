@@ -385,22 +385,67 @@ CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localho
 
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "AdOptimizer",
-    "DESCRIPTION": "Save costs on your Ad spend.",  # noqa: E501
-    "VERSION": "0.1.0",
+    "TITLE": "AdOptimizer API",
+    "DESCRIPTION": "Complete API documentation for AdOptimizer - Save costs on your Ad spend with powerful Facebook advertising optimization tools.",  # noqa: E501
+    "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "SWAGGER_UI_SETTINGS": {
         "displayOperationId": True,
+        "docExpansion": "none",
+        "filter": True,
+        "tagsSorter": "alpha",
+        "operationsSorter": "alpha",
     },
     "PREPROCESSING_HOOKS": [
         "apps.api.schema.filter_schema_apis",
     ],
+    "POSTPROCESSING_HOOKS": [
+        "apps.api.schema.postprocess_schema_enhancements",
+    ],
     "APPEND_COMPONENTS": {
-        "securitySchemes": {"ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "Authorization"}}
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "API Key authentication. Use format: 'Api-Key YOUR_API_KEY'"
+            },
+            "SessionAuth": {
+                "type": "apiKey",
+                "in": "cookie",
+                "name": "sessionid",
+                "description": "Django session authentication"
+            }
+        }
     },
     "SECURITY": [
         {
             "ApiKeyAuth": [],
+        },
+        {
+            "SessionAuth": [],
+        }
+    ],
+    "TAGS": [
+        {
+            "name": "Facebook Authentication",
+            "description": "Manage Facebook access tokens and authentication"
+        },
+        {
+            "name": "Facebook Integration",
+            "description": "Facebook API integration endpoints"
+        },
+        {
+            "name": "User Management",
+            "description": "User account and profile management"
+        },
+        {
+            "name": "Dashboard",
+            "description": "Dashboard and analytics endpoints"
+        },
+        {
+            "name": "API",
+            "description": "General API endpoints"
         }
     ],
 }

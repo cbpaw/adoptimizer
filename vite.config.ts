@@ -10,7 +10,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@/components': path.resolve(__dirname, './assets/javascript/shadcn/components'),
+      '@/components': path.resolve(__dirname, './assets/javascript/components'),
+      '@/shadcn': path.resolve(__dirname, './assets/javascript/shadcn'),
       '@/utilities': path.resolve(__dirname, './assets/javascript/utilities'),
       '@': path.resolve(__dirname, './assets/javascript'),
       // this may not be needed anymore, but leaving it shouldn't hurt
@@ -29,6 +30,7 @@ export default defineConfig({
         'site': path.resolve(__dirname, './assets/javascript/site.js'),
         'app': path.resolve(__dirname, './assets/javascript/app.js'),
         'dashboard': path.resolve(__dirname, './assets/javascript/shadcn-dashboard/index.jsx'),
+        'settings': path.resolve(__dirname, './assets/javascript/settings.jsx'),
         'pegasus': path.resolve(__dirname, './assets/javascript/pegasus/pegasus.js'),
         'react-object-lifecycle': path.resolve(__dirname, './assets/javascript/pegasus/examples/react/react-object-lifecycle.jsx'),
         'vue-object-lifecycle': path.resolve(__dirname, './assets/javascript/pegasus/examples/vue/vue-object-lifecycle.js'),

@@ -1,0 +1,19 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block app %}
+<!-- React Settings Container -->
+<section class="app-card">
+  <div
+    id="settings-container"
+    data-facebook-token='{% if has_token %}{{ facebook_token_json|safe }}{% else %}null{% endif %}'
+    data-csrf-token="{{ csrf_token }}"
+  ></div>
+</section>
+{% endblock %}
+
+{% block page_js %}
+{% vite_react_refresh %}
+{% vite_asset 'assets/javascript/settings.jsx' %}
+{% endblock %}

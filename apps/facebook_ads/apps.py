@@ -1,0 +1,7 @@
+from django.apps import AppConfig
+
+
+class FacebookAdsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.facebook_ads"
+    verbose_name = "Facebook Ads Management"

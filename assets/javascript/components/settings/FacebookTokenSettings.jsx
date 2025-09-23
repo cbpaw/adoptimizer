@@ -219,7 +219,7 @@ export function FacebookTokenSettings({ initialToken, csrfToken }) {
   const handleTokenSubmit = async (accessToken) => {
     setIsLoading(true)
     try {
-      const response = await fetch('/facebook/api/validate-token/', {
+      const response = await fetch('/api/v1/facebook/token/validate/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +259,7 @@ export function FacebookTokenSettings({ initialToken, csrfToken }) {
     }
 
     try {
-      const response = await fetch('/facebook/api/revoke-token/', {
+      const response = await fetch('/api/v1/facebook/token/revoke/', {
         method: 'POST',
         headers: {
           'X-CSRFToken': csrfToken

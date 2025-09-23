@@ -27,6 +27,7 @@ The following commands can be used for various tools and workflows:
 - Lint Python: `make ruff-lint`
 - Format Python: `make ruff-format`
 - Update translations: `make translations`
+- Generate API docs: `make manage ARGS='generate_openapi --output=static/openapi.yaml'`
 
 Additional useful commands:
 - Start all services: `make start`

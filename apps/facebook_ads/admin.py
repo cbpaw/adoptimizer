@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import FacebookAdAccount, FacebookAd, FacebookCampaign, SelectedCampaign
+from .models import (
+    FacebookAdAccount, 
+    FacebookCampaign, 
+    SelectedCampaign, 
+    FacebookAd,
+    FacebookAdSet,
+    FacebookCampaignInsights,
+    FacebookAdInsights,
+    DashboardPeriod
+)
 
 
 @admin.register(FacebookAdAccount)
@@ -133,3 +142,143 @@ class FacebookAdAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('ad_account')
+
+
+@admin.register(FacebookAdSet)
+class FacebookAdSetAdmin(admin.ModelAdmin):
+    list_display = ['adset_name', 'adset_id', 'status', 'effective_status', 'campaign', 'daily_budget', 'lifetime_budget', 'spend', 'impressions', 'clicks', 'last_synced']
+    list_filter = ['status', 'effective_status', 'campaign__ad_account', 'optimization_goal', 'billing_event', 'last_synced']
+    search_fields = ['adset_name', 'adset_id', 'campaign__campaign_name']
+    readonly_fields = ['adset_id', 'last_synced', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        ('AdSet Information', {
+            'fields': ('ad_account', 'campaign', 'adset_id', 'adset_name')
+        }),
+        ('Status', {
+            'fields': ('status', 'effective_status', 'configured_status')
+        }),
+        ('Budget & Bidding', {
+            'fields': ('daily_budget', 'lifetime_budget', 'bid_amount', 'bid_strategy', 'optimization_goal', 'billing_event'),
+            'classes': ('collapse',)
+        }),
+        ('Performance Metrics', {
+            'fields': ('impressions', 'clicks', 'spend', 'reach', 'frequency', 'ctr', 'cpm', 'cpc'),
+            'classes': ('collapse',)
+        }),
+        ('Conversion Metrics', {
+            'fields': ('purchase_roas', 'website_purchase_roas'),
+            'classes': ('collapse',)
+        }),
+        ('Targeting', {
+            'fields': ('targeting_data',),
+            'classes': ('collapse',)
+        }),
+        ('Complex Data', {
+            'fields': ('actions_data', 'conversions_data'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('start_time', 'end_time', 'created_time', 'updated_time', 'last_synced'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('ad_account', 'campaign')
+
+
+@admin.register(FacebookCampaignInsights)
+class FacebookCampaignInsightsAdmin(admin.ModelAdmin):
+    list_display = ['campaign', 'date_start', 'date_stop', 'impressions', 'clicks', 'spend', 'ctr', 'cpc', 'purchase_roas', 'purchases']
+    list_filter = ['date_start', 'date_stop', 'campaign__ad_account', 'campaign__status']
+    search_fields = ['campaign__campaign_name', 'campaign__campaign_id']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'date_start'
+    
+    fieldsets = (
+        ('Campaign & Period', {
+            'fields': ('campaign', 'date_start', 'date_stop')
+        }),
+        ('Core Metrics', {
+            'fields': ('impressions', 'clicks', 'spend', 'reach', 'frequency'),
+        }),
+        ('Calculated Metrics', {
+            'fields': ('ctr', 'cpc', 'cpm'),
+        }),
+        ('Conversion Metrics', {
+            'fields': ('purchase_roas', 'website_purchase_roas', 'purchase_value', 'purchases'),
+        }),
+        ('Additional Metrics', {
+            'fields': ('link_clicks', 'inline_link_clicks', 'outbound_clicks', 'post_engagement', 'video_views', 'unique_clicks', 'unique_ctr'),
+            'classes': ('collapse',)
+        }),
+        ('Video Metrics', {
+            'fields': ('video_p25_watched', 'video_p50_watched', 'video_p75_watched', 'video_p100_watched', 'video_avg_time_watched'),
+            'classes': ('collapse',)
+        }),
+        ('Complex Data', {
+            'fields': ('actions_data', 'conversions_data'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign')
+
+
+@admin.register(FacebookAdInsights)
+class FacebookAdInsightsAdmin(admin.ModelAdmin):
+    list_display = ['ad', 'campaign', 'date_start', 'date_stop', 'impressions', 'clicks', 'spend', 'ctr', 'cpc', 'purchase_roas']
+    list_filter = ['date_start', 'date_stop', 'campaign__ad_account', 'ad__status']
+    search_fields = ['ad__ad_name', 'ad__ad_id', 'campaign__campaign_name']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'date_start'
+    
+    fieldsets = (
+        ('Ad & Campaign & Period', {
+            'fields': ('ad', 'adset', 'campaign', 'date_start', 'date_stop')
+        }),
+        ('Core Metrics', {
+            'fields': ('impressions', 'clicks', 'spend', 'reach', 'frequency'),
+        }),
+        ('Calculated Metrics', {
+            'fields': ('ctr', 'cpc', 'cpm'),
+        }),
+        ('Conversion Metrics', {
+            'fields': ('purchase_roas', 'website_purchase_roas', 'purchase_value', 'purchases'),
+        }),
+        ('Additional Metrics', {
+            'fields': ('link_clicks', 'inline_link_clicks', 'outbound_clicks', 'post_engagement', 'video_views', 'unique_clicks', 'unique_ctr'),
+            'classes': ('collapse',)
+        }),
+        ('Video Metrics', {
+            'fields': ('video_p25_watched', 'video_p50_watched', 'video_p75_watched', 'video_p100_watched', 'video_avg_time_watched'),
+            'classes': ('collapse',)
+        }),
+        ('Complex Data', {
+            'fields': ('actions_data', 'conversions_data'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('ad', 'adset', 'campaign')
+
+
+@admin.register(DashboardPeriod)
+class DashboardPeriodAdmin(admin.ModelAdmin):
+    list_display = ['display_name', 'name', 'days', 'date_preset', 'is_custom', 'is_active', 'sort_order']
+    list_filter = ['is_custom', 'is_active']
+    search_fields = ['name', 'display_name']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['sort_order', 'name']
+    
+    fieldsets = (
+        ('Period Configuration', {
+            'fields': ('name', 'display_name', 'days', 'date_preset', 'sort_order')
+        }),
+        ('Settings', {
+            'fields': ('is_custom', 'is_active'),
+        }),
+    )

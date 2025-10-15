@@ -175,3 +175,197 @@ class FacebookAd(BaseModel):
 
     def __str__(self):
         return f"{self.ad_name} ({self.ad_id})"
+
+
+class FacebookAdSet(BaseModel):
+    """Model to store Facebook AdSet information"""
+    ad_account = models.ForeignKey(FacebookAdAccount, on_delete=models.CASCADE, related_name='adsets')
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='adsets')
+    adset_id = models.CharField(max_length=100, unique=True)
+    adset_name = models.CharField(max_length=255)
+    status = models.CharField(max_length=50)
+    effective_status = models.CharField(max_length=50, blank=True)
+    configured_status = models.CharField(max_length=50, blank=True)
+    
+    # Budget & Bidding
+    daily_budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    lifetime_budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    bid_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    bid_strategy = models.CharField(max_length=100, blank=True)
+    optimization_goal = models.CharField(max_length=100, blank=True)
+    billing_event = models.CharField(max_length=100, blank=True)
+    
+    # Targeting
+    targeting_data = models.JSONField(default=dict, blank=True)
+    
+    # Performance metrics
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    spend = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reach = models.BigIntegerField(default=0)
+    frequency = models.FloatField(default=0)
+    ctr = models.FloatField(default=0)
+    cpm = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cpc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Conversion metrics
+    purchase_roas = models.FloatField(default=0)
+    website_purchase_roas = models.FloatField(default=0)
+    
+    # Timestamps
+    start_time = models.DateTimeField(null=True, blank=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    created_time = models.DateTimeField(null=True, blank=True)
+    updated_time = models.DateTimeField(null=True, blank=True)
+    last_synced = models.DateTimeField(auto_now=True)
+    
+    # Complex data as JSON
+    actions_data = models.JSONField(default=dict, blank=True)
+    conversions_data = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        verbose_name = "Facebook AdSet"
+        verbose_name_plural = "Facebook AdSets"
+        ordering = ['-last_synced']
+        unique_together = ['ad_account', 'adset_id']
+    
+    def __str__(self):
+        return f"{self.adset_name} ({self.adset_id})"
+
+
+class FacebookCampaignInsights(BaseModel):
+    """Model to store historical campaign insights data"""
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='insights')
+    date_start = models.DateField()
+    date_stop = models.DateField()
+    
+    # Core Metrics
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    spend = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reach = models.BigIntegerField(default=0)
+    frequency = models.FloatField(default=0)
+    
+    # Calculated Metrics
+    ctr = models.FloatField(default=0)
+    cpc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cpm = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Conversion Metrics
+    purchase_roas = models.FloatField(default=0)
+    website_purchase_roas = models.FloatField(default=0)
+    purchase_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    purchases = models.IntegerField(default=0)
+    
+    # Additional Metrics
+    link_clicks = models.BigIntegerField(default=0)
+    inline_link_clicks = models.BigIntegerField(default=0)
+    outbound_clicks = models.BigIntegerField(default=0)
+    post_engagement = models.BigIntegerField(default=0)
+    video_views = models.BigIntegerField(default=0)
+    unique_clicks = models.BigIntegerField(default=0)
+    unique_ctr = models.FloatField(default=0)
+    
+    # Video metrics
+    video_p25_watched = models.BigIntegerField(default=0)
+    video_p50_watched = models.BigIntegerField(default=0)
+    video_p75_watched = models.BigIntegerField(default=0)
+    video_p100_watched = models.BigIntegerField(default=0)
+    video_avg_time_watched = models.FloatField(default=0)
+    
+    # Complex data as JSON
+    actions_data = models.JSONField(default=dict, blank=True)
+    conversions_data = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        verbose_name = "Facebook Campaign Insights"
+        verbose_name_plural = "Facebook Campaign Insights"
+        ordering = ['-date_start']
+        unique_together = ['campaign', 'date_start', 'date_stop']
+        indexes = [
+            models.Index(fields=['campaign', 'date_start']),
+            models.Index(fields=['date_start', 'date_stop']),
+        ]
+    
+    def __str__(self):
+        return f"{self.campaign.campaign_name} - {self.date_start} to {self.date_stop}"
+
+
+class DashboardPeriod(BaseModel):
+    """Model to store dashboard period configurations"""
+    name = models.CharField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=100)
+    days = models.IntegerField(null=True, blank=True)
+    date_preset = models.CharField(max_length=50, blank=True)
+    is_custom = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+    
+    class Meta:
+        verbose_name = "Dashboard Period"
+        verbose_name_plural = "Dashboard Periods"
+        ordering = ['sort_order', 'name']
+    
+    def __str__(self):
+        return self.display_name
+
+
+class FacebookAdInsights(BaseModel):
+    """Model to store historical ad insights data"""
+    ad = models.ForeignKey(FacebookAd, on_delete=models.CASCADE, related_name='insights')
+    adset = models.ForeignKey(FacebookAdSet, on_delete=models.CASCADE, related_name='ad_insights', null=True, blank=True)
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='ad_insights')
+    date_start = models.DateField()
+    date_stop = models.DateField()
+    
+    # Core Metrics
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    spend = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    reach = models.BigIntegerField(default=0)
+    frequency = models.FloatField(default=0)
+    
+    # Calculated Metrics
+    ctr = models.FloatField(default=0)
+    cpc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cpm = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Conversion Metrics
+    purchase_roas = models.FloatField(default=0)
+    website_purchase_roas = models.FloatField(default=0)
+    purchase_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    purchases = models.IntegerField(default=0)
+    
+    # Additional Metrics
+    link_clicks = models.BigIntegerField(default=0)
+    inline_link_clicks = models.BigIntegerField(default=0)
+    outbound_clicks = models.BigIntegerField(default=0)
+    post_engagement = models.BigIntegerField(default=0)
+    video_views = models.BigIntegerField(default=0)
+    unique_clicks = models.BigIntegerField(default=0)
+    unique_ctr = models.FloatField(default=0)
+    
+    # Video metrics
+    video_p25_watched = models.BigIntegerField(default=0)
+    video_p50_watched = models.BigIntegerField(default=0)
+    video_p75_watched = models.BigIntegerField(default=0)
+    video_p100_watched = models.BigIntegerField(default=0)
+    video_avg_time_watched = models.FloatField(default=0)
+    
+    # Complex data as JSON
+    actions_data = models.JSONField(default=dict, blank=True)
+    conversions_data = models.JSONField(default=dict, blank=True)
+    
+    class Meta:
+        verbose_name = "Facebook Ad Insights"
+        verbose_name_plural = "Facebook Ad Insights"
+        ordering = ['-date_start']
+        unique_together = ['ad', 'date_start', 'date_stop']
+        indexes = [
+            models.Index(fields=['ad', 'date_start']),
+            models.Index(fields=['campaign', 'date_start']),
+            models.Index(fields=['date_start', 'date_stop']),
+        ]
+    
+    def __str__(self):
+        return f"{self.ad.ad_name} - {self.date_start} to {self.date_stop}"

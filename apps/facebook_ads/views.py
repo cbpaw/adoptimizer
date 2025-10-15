@@ -1840,3 +1840,386 @@ def get_comprehensive_ads_data(request):
             'success': False,
             'message': f'An error occurred: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# New Dashboard API Endpoints
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_data(request):
+    """Get dashboard data with period filtering"""
+    try:
+        from .services import DashboardService
+        
+        period = request.GET.get('period', 'last_7d')
+        account_ids = request.GET.get('account_ids', '')
+        
+        # Parse account IDs
+        account_ids_list = []
+        if account_ids:
+            account_ids_list = [int(id.strip()) for id in account_ids.split(',') if id.strip()]
+        
+        service = DashboardService(request.user)
+        data = service.get_dashboard_data(period, account_ids_list)
+        
+        return Response({
+            'success': True,
+            'data': data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting dashboard data: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def campaign_insights(request, campaign_id):
+    """Get insights for a specific campaign"""
+    try:
+        from .services import DashboardService
+        
+        period = request.GET.get('period', 'last_30d')
+        
+        # Find the campaign
+        campaign = FacebookCampaign.objects.get(
+            campaign_id=campaign_id,
+            ad_account__user=request.user
+        )
+        
+        service = DashboardService(request.user)
+        insights = service.get_campaign_insights(campaign, period)
+        
+        return Response({
+            'success': True,
+            'data': insights
+        })
+        
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error getting campaign insights: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting campaign insights: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_periods(request):
+    """Get available dashboard periods"""
+    try:
+        from .services import DashboardService
+        
+        service = DashboardService(request.user)
+        periods = [
+            {'name': 'today', 'display_name': 'Vandaag'},
+            {'name': 'yesterday', 'display_name': 'Gisteren'},
+            {'name': 'last_7d', 'display_name': 'Laatste 7 dagen'},
+            {'name': 'last_14d', 'display_name': 'Laatste 14 dagen'},
+            {'name': 'last_30d', 'display_name': 'Laatste 30 dagen'},
+            {'name': 'this_month', 'display_name': 'Deze maand'},
+            {'name': 'last_month', 'display_name': 'Vorige maand'},
+        ]
+        
+        return Response({
+            'success': True,
+            'periods': periods
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting dashboard periods: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting dashboard periods: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def trigger_sync(request):
+    """Trigger manual sync for user's accounts"""
+    try:
+        from .tasks import sync_facebook_campaigns, full_account_sync
+        
+        sync_type = request.data.get('sync_type', 'campaigns')
+        account_id = request.data.get('account_id')
+        
+        if account_id:
+            # Sync specific account
+            account = FacebookAdAccount.objects.get(
+                id=account_id,
+                user=request.user,
+                is_active=True
+            )
+            
+            if sync_type == 'full':
+                task = full_account_sync.delay(account.id)
+            else:
+                task = sync_facebook_campaigns.delay(account.id)
+            
+            return Response({
+                'success': True,
+                'message': f'Sync started for account {account.ad_account_name}',
+                'task_id': task.id
+            })
+        else:
+            # Sync all user's accounts
+            task = sync_facebook_campaigns.delay()
+            
+            return Response({
+                'success': True,
+                'message': 'Sync started for all accounts',
+                'task_id': task.id
+            })
+            
+    except FacebookAdAccount.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Account not found or not accessible'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error triggering sync: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error triggering sync: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def sync_status(request, task_id):
+    """Get sync task status"""
+    try:
+        from celery.result import AsyncResult
+        
+        task = AsyncResult(task_id)
+        
+        return Response({
+            'success': True,
+            'task_id': task_id,
+            'status': task.status,
+            'result': task.result,
+            'info': task.info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting sync status: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting sync status: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def campaign_performance_alerts(request):
+    """Get performance alerts for campaigns"""
+    try:
+        from .services import DashboardService
+        
+        service = DashboardService(request.user)
+        
+        # Get campaigns
+        campaigns = FacebookCampaign.objects.filter(
+            ad_account__user=request.user,
+            ad_account__is_active=True
+        )
+        
+        # Generate alerts
+        alerts = service._generate_alerts(None, campaigns)
+        
+        return Response({
+            'success': True,
+            'alerts': alerts
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting performance alerts: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting performance alerts: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def campaign_trends(request):
+    """Get campaign trends data"""
+    try:
+        from .services import DashboardService
+        
+        period = request.GET.get('period', 'last_30d')
+        campaign_ids = request.GET.get('campaign_ids', '')
+        
+        service = DashboardService(request.user)
+        
+        # Get specific campaigns or all campaigns
+        if campaign_ids:
+            campaign_ids_list = [id.strip() for id in campaign_ids.split(',') if id.strip()]
+            campaigns = FacebookCampaign.objects.filter(
+                campaign_id__in=campaign_ids_list,
+                ad_account__user=request.user
+            )
+        else:
+            campaigns = FacebookCampaign.objects.filter(
+                ad_account__user=request.user,
+                ad_account__is_active=True
+            )
+        
+        # Get period and date range
+        period_config = service._get_period_config(period)
+        date_range = service._get_date_range(period_config)
+        
+        # Get insights for trends
+        insights = service._get_insights_for_period(campaigns, date_range)
+        trends = service._calculate_trends(insights)
+        
+        return Response({
+            'success': True,
+            'trends': trends,
+            'period': period_config
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting campaign trends: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting campaign trends: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def adset_data(request, campaign_id):
+    """Get AdSet data for a specific campaign"""
+    try:
+        from .models import FacebookAdSet
+        
+        # Verify campaign belongs to user
+        campaign = FacebookCampaign.objects.get(
+            campaign_id=campaign_id,
+            ad_account__user=request.user
+        )
+        
+        # Get AdSets for this campaign
+        adsets = FacebookAdSet.objects.filter(
+            campaign=campaign
+        ).order_by('-last_synced')
+        
+        adset_data = []
+        for adset in adsets:
+            adset_data.append({
+                'adset_id': adset.adset_id,
+                'adset_name': adset.adset_name,
+                'status': adset.status,
+                'effective_status': adset.effective_status,
+                'daily_budget': float(adset.daily_budget) if adset.daily_budget else None,
+                'lifetime_budget': float(adset.lifetime_budget) if adset.lifetime_budget else None,
+                'bid_amount': float(adset.bid_amount) if adset.bid_amount else None,
+                'optimization_goal': adset.optimization_goal,
+                'spend': float(adset.spend),
+                'impressions': adset.impressions,
+                'clicks': adset.clicks,
+                'ctr': adset.ctr,
+                'cpc': float(adset.cpc),
+                'roas': adset.purchase_roas,
+                'start_time': adset.start_time,
+                'end_time': adset.end_time,
+                'last_synced': adset.last_synced
+            })
+        
+        return Response({
+            'success': True,
+            'campaign': {
+                'id': campaign.campaign_id,
+                'name': campaign.campaign_name,
+                'status': campaign.status
+            },
+            'adsets': adset_data
+        })
+        
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error getting AdSet data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting AdSet data: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ad_data(request, campaign_id):
+    """Get Ad data for a specific campaign"""
+    try:
+        # Verify campaign belongs to user
+        campaign = FacebookCampaign.objects.get(
+            campaign_id=campaign_id,
+            ad_account__user=request.user
+        )
+        
+        # Get Ads for this campaign
+        ads = FacebookAd.objects.filter(
+            campaign_id=campaign_id,
+            ad_account__user=request.user
+        ).order_by('-last_synced')
+        
+        ad_data = []
+        for ad in ads:
+            ad_data.append({
+                'ad_id': ad.ad_id,
+                'ad_name': ad.ad_name,
+                'status': ad.status,
+                'effective_status': ad.effective_status,
+                'adset_id': ad.adset_id,
+                'adset_name': ad.adset_name,
+                'creative_title': ad.creative_title,
+                'creative_body': ad.creative_body,
+                'creative_image_url': ad.creative_image_url,
+                'call_to_action_type': ad.call_to_action_type,
+                'spend': float(ad.spend),
+                'impressions': ad.impressions,
+                'clicks': ad.clicks,
+                'ctr': ad.ctr,
+                'cpc': float(ad.cpc),
+                'roas': ad.purchase_roas,
+                'quality_ranking': ad.quality_ranking,
+                'engagement_rate_ranking': ad.engagement_rate_ranking,
+                'conversion_rate_ranking': ad.conversion_rate_ranking,
+                'created_time': ad.created_time,
+                'last_synced': ad.last_synced
+            })
+        
+        return Response({
+            'success': True,
+            'campaign': {
+                'id': campaign.campaign_id,
+                'name': campaign.campaign_name,
+                'status': campaign.status
+            },
+            'ads': ad_data
+        })
+        
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error getting Ad data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error getting Ad data: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -44,4 +44,18 @@ urlpatterns = [
     path('api/campaign-detailed-insights/', views.get_campaign_detailed_insights, name='api_campaign_detailed_insights'),
     path('api/comprehensive-campaign-data/', views.get_comprehensive_campaign_data, name='api_comprehensive_campaign_data'),
     path('api/comprehensive-ads-data/', views.get_comprehensive_ads_data, name='api_comprehensive_ads_data'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+    # New dashboard API endpoints
+    path('api/dashboard/data/', views.dashboard_data, name='api_dashboard_data'),
+    path('api/dashboard/periods/', views.dashboard_periods, name='api_dashboard_periods'),
+    path('api/campaigns/<str:campaign_id>/insights/', views.campaign_insights, name='api_campaign_insights'),
+    path('api/campaigns/<str:campaign_id>/adsets/', views.adset_data, name='api_adset_data'),
+    path('api/campaigns/<str:campaign_id>/ads/', views.ad_data, name='api_ad_data'),
+    path('api/campaigns/trends/', views.campaign_trends, name='api_campaign_trends'),
+    path('api/campaigns/alerts/', views.campaign_performance_alerts, name='api_campaign_alerts'),
+    path('api/sync/trigger/', views.trigger_sync, name='api_trigger_sync'),
+    path('api/sync/status/<str:task_id>/', views.sync_status, name='api_sync_status'),
+]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

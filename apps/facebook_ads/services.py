@@ -880,3 +880,545 @@ def exchange_code_for_token(app_id: str, app_secret: str, code: str, redirect_ur
     
     data = response.json()
     return data['access_token'] 
+
+
+from datetime import datetime, timedelta
+from django.db.models import Sum, Avg, Count, Q
+from django.utils import timezone
+from decimal import Decimal
+
+
+class DashboardService:
+    """Service class for dashboard data aggregation and analytics"""
+    
+    def __init__(self, user):
+        self.user = user
+    
+    def get_dashboard_data(self, period_name='last_7d', account_ids=None):
+        """Main method to get dashboard data"""
+        from .models import FacebookCampaign, FacebookCampaignInsights, DashboardPeriod
+        
+        period = self._get_period_config(period_name)
+        date_range = self._get_date_range(period)
+        
+        # Get campaigns
+        campaigns = self._get_campaigns_for_period(date_range, account_ids)
+        
+        # Get insights
+        insights = self._get_insights_for_period(campaigns, date_range)
+        
+        # Get current campaign data as fallback
+        current_campaign_data = self._get_current_campaign_data(campaigns)
+        
+        return {
+            'summary': self._calculate_summary_metrics(insights, current_campaign_data),
+            'campaigns': self._format_campaign_data(campaigns, insights),
+            'trends': self._calculate_trends(insights),
+            'period': period,
+            'date_range': date_range,
+            'alerts': self._generate_alerts(insights, campaigns)
+        }
+    
+    def _get_period_config(self, period_name):
+        """Get period configuration"""
+        periods = {
+            'today': {
+                'name': 'today',
+                'display_name': 'Vandaag',
+                'days': 1,
+                'date_preset': 'today'
+            },
+            'yesterday': {
+                'name': 'yesterday',
+                'display_name': 'Gisteren',
+                'days': 1,
+                'date_preset': 'yesterday'
+            },
+            'last_7d': {
+                'name': 'last_7d',
+                'display_name': 'Laatste 7 dagen',
+                'days': 7,
+                'date_preset': 'last_7d'
+            },
+            'last_14d': {
+                'name': 'last_14d',
+                'display_name': 'Laatste 14 dagen',
+                'days': 14,
+                'date_preset': 'last_14d'
+            },
+            'last_30d': {
+                'name': 'last_30d',
+                'display_name': 'Laatste 30 dagen',
+                'days': 30,
+                'date_preset': 'last_30d'
+            },
+            'this_month': {
+                'name': 'this_month',
+                'display_name': 'Deze maand',
+                'days': None,
+                'date_preset': 'this_month'
+            },
+            'last_month': {
+                'name': 'last_month',
+                'display_name': 'Vorige maand',
+                'days': None,
+                'date_preset': 'last_month'
+            }
+        }
+        return periods.get(period_name, periods['last_7d'])
+    
+    def _get_date_range(self, period):
+        """Calculate date range based on period"""
+        today = timezone.now().date()
+        
+        if period['name'] == 'today':
+            return {'start': today, 'end': today}
+        elif period['name'] == 'yesterday':
+            yesterday = today - timedelta(days=1)
+            return {'start': yesterday, 'end': yesterday}
+        elif period['name'] == 'last_7d':
+            start = today - timedelta(days=7)
+            return {'start': start, 'end': today}
+        elif period['name'] == 'last_14d':
+            start = today - timedelta(days=14)
+            return {'start': start, 'end': today}
+        elif period['name'] == 'last_30d':
+            start = today - timedelta(days=30)
+            return {'start': start, 'end': today}
+        elif period['name'] == 'this_month':
+            start = today.replace(day=1)
+            return {'start': start, 'end': today}
+        elif period['name'] == 'last_month':
+            first_day_this_month = today.replace(day=1)
+            last_day_last_month = first_day_this_month - timedelta(days=1)
+            first_day_last_month = last_day_last_month.replace(day=1)
+            return {'start': first_day_last_month, 'end': last_day_last_month}
+        else:
+            # Default to last 7 days
+            start = today - timedelta(days=7)
+            return {'start': start, 'end': today}
+    
+    def _get_campaigns_for_period(self, date_range, account_ids):
+        """Get campaigns for the period"""
+        from .models import FacebookCampaign
+        
+        query = FacebookCampaign.objects.filter(
+            ad_account__user=self.user,
+            ad_account__is_active=True
+        )
+        
+        if account_ids:
+            query = query.filter(ad_account_id__in=account_ids)
+        
+        return query.select_related('ad_account').order_by('-last_synced')
+    
+    def _get_insights_for_period(self, campaigns, date_range):
+        """Get insights for the period"""
+        from .models import FacebookCampaignInsights
+        
+        campaign_ids = [c.id for c in campaigns]
+        
+        if not campaign_ids:
+            return FacebookCampaignInsights.objects.none()
+        
+        return FacebookCampaignInsights.objects.filter(
+            campaign_id__in=campaign_ids,
+            date_start__gte=date_range['start'],
+            date_stop__lte=date_range['end']
+        ).select_related('campaign').order_by('-date_start')
+    
+    def _get_current_campaign_data(self, campaigns):
+        """Get current campaign data as fallback when no insights available"""
+        campaign_data = []
+        
+        for campaign in campaigns:
+            campaign_data.append({
+                'campaign_id': campaign.campaign_id,
+                'campaign_name': campaign.campaign_name,
+                'spend': float(campaign.spend),
+                'impressions': campaign.impressions,
+                'clicks': campaign.clicks,
+                'ctr': campaign.ctr,
+                'cpc': float(campaign.cpc),
+                'cpm': float(campaign.cpm),
+                'purchase_roas': campaign.purchase_roas,
+                'status': campaign.status,
+                'effective_status': campaign.effective_status
+            })
+        
+        return campaign_data
+    
+    def _calculate_summary_metrics(self, insights, current_campaign_data):
+        """Calculate summary metrics"""
+        if insights.exists():
+            # Use insights data
+            aggregated = insights.aggregate(
+                total_spend=Sum('spend'),
+                total_impressions=Sum('impressions'),
+                total_clicks=Sum('clicks'),
+                total_purchases=Sum('purchases'),
+                total_purchase_value=Sum('purchase_value'),
+                total_reach=Sum('reach'),
+                total_link_clicks=Sum('link_clicks')
+            )
+        else:
+            # Use current campaign data as fallback
+            aggregated = {
+                'total_spend': sum(c['spend'] for c in current_campaign_data),
+                'total_impressions': sum(c['impressions'] for c in current_campaign_data),
+                'total_clicks': sum(c['clicks'] for c in current_campaign_data),
+                'total_purchases': 0,
+                'total_purchase_value': 0,
+                'total_reach': 0,
+                'total_link_clicks': 0
+            }
+        
+        # Calculate derived metrics
+        total_spend = float(aggregated['total_spend'] or 0)
+        total_impressions = aggregated['total_impressions'] or 0
+        total_clicks = aggregated['total_clicks'] or 0
+        total_purchase_value = float(aggregated['total_purchase_value'] or 0)
+        total_purchases = aggregated['total_purchases'] or 0
+        total_reach = aggregated['total_reach'] or 0
+        
+        return {
+            'total_spend': total_spend,
+            'total_impressions': total_impressions,
+            'total_clicks': total_clicks,
+            'total_purchases': total_purchases,
+            'total_reach': total_reach,
+            'average_cpc': total_spend / total_clicks if total_clicks > 0 else 0,
+            'average_ctr': (total_clicks / total_impressions) * 100 if total_impressions > 0 else 0,
+            'total_roas': total_purchase_value / total_spend if total_spend > 0 else 0,
+            'campaign_count': len(current_campaign_data) if not insights.exists() else insights.values('campaign').distinct().count()
+        }
+    
+    def _format_campaign_data(self, campaigns, insights):
+        """Format campaign data for frontend"""
+        campaign_data = []
+        
+        # Group insights by campaign
+        insights_by_campaign = {}
+        for insight in insights:
+            campaign_id = insight.campaign.campaign_id
+            if campaign_id not in insights_by_campaign:
+                insights_by_campaign[campaign_id] = []
+            insights_by_campaign[campaign_id].append(insight)
+        
+        for campaign in campaigns:
+            campaign_insights = insights_by_campaign.get(campaign.campaign_id, [])
+            
+            if campaign_insights:
+                # Aggregate insights data
+                total_spend = sum(i.spend for i in campaign_insights)
+                total_impressions = sum(i.impressions for i in campaign_insights)
+                total_clicks = sum(i.clicks for i in campaign_insights)
+                total_purchases = sum(i.purchases for i in campaign_insights)
+                total_purchase_value = sum(i.purchase_value for i in campaign_insights)
+                
+                # Calculate averages
+                avg_ctr = sum(i.ctr for i in campaign_insights) / len(campaign_insights) if campaign_insights else 0
+                avg_cpc = total_spend / total_clicks if total_clicks > 0 else 0
+                avg_roas = total_purchase_value / total_spend if total_spend > 0 else 0
+            else:
+                # Use current campaign data
+                total_spend = float(campaign.spend)
+                total_impressions = campaign.impressions
+                total_clicks = campaign.clicks
+                total_purchases = 0
+                total_purchase_value = 0
+                avg_ctr = campaign.ctr
+                avg_cpc = float(campaign.cpc)
+                avg_roas = campaign.purchase_roas
+            
+            campaign_data.append({
+                'campaign_id': campaign.campaign_id,
+                'campaign_name': campaign.campaign_name,
+                'status': campaign.status,
+                'effective_status': campaign.effective_status,
+                'objective': campaign.objective,
+                'spend': total_spend,
+                'impressions': total_impressions,
+                'clicks': total_clicks,
+                'purchases': total_purchases,
+                'purchase_value': total_purchase_value,
+                'ctr': avg_ctr,
+                'cpc': avg_cpc,
+                'roas': avg_roas,
+                'daily_budget': float(campaign.daily_budget) if campaign.daily_budget else None,
+                'lifetime_budget': float(campaign.lifetime_budget) if campaign.lifetime_budget else None,
+                'start_time': campaign.start_time,
+                'last_synced': campaign.last_synced,
+                'ad_account_name': campaign.ad_account.ad_account_name
+            })
+        
+        return campaign_data
+    
+    def _calculate_trends(self, insights):
+        """Calculate trends data for charts"""
+        if not insights.exists():
+            return {
+                'daily_spend': [],
+                'daily_impressions': [],
+                'daily_clicks': [],
+                'daily_conversions': []
+            }
+        
+        # Group by date
+        daily_data = {}
+        for insight in insights:
+            date_str = insight.date_start.strftime('%Y-%m-%d')
+            if date_str not in daily_data:
+                daily_data[date_str] = {
+                    'spend': 0,
+                    'impressions': 0,
+                    'clicks': 0,
+                    'conversions': 0
+                }
+            
+            daily_data[date_str]['spend'] += float(insight.spend)
+            daily_data[date_str]['impressions'] += insight.impressions
+            daily_data[date_str]['clicks'] += insight.clicks
+            daily_data[date_str]['conversions'] += insight.purchases
+        
+        # Sort by date
+        sorted_dates = sorted(daily_data.keys())
+        
+        return {
+            'daily_spend': [{'date': date, 'value': daily_data[date]['spend']} for date in sorted_dates],
+            'daily_impressions': [{'date': date, 'value': daily_data[date]['impressions']} for date in sorted_dates],
+            'daily_clicks': [{'date': date, 'value': daily_data[date]['clicks']} for date in sorted_dates],
+            'daily_conversions': [{'date': date, 'value': daily_data[date]['conversions']} for date in sorted_dates]
+        }
+    
+    def _generate_alerts(self, insights, campaigns):
+        """Generate alerts based on performance"""
+        alerts = []
+        
+        # Check for campaigns with low ROAS
+        low_roas_campaigns = []
+        for campaign in campaigns:
+            if campaign.purchase_roas < 1.0 and campaign.spend > 50:
+                low_roas_campaigns.append(campaign)
+        
+        if low_roas_campaigns:
+            alerts.append({
+                'type': 'warning',
+                'title': 'Lage ROAS gedetecteerd',
+                'message': f'{len(low_roas_campaigns)} campagne(s) hebben een ROAS onder de 1.0',
+                'campaigns': [c.campaign_name for c in low_roas_campaigns]
+            })
+        
+        # Check for campaigns with high spend but low conversions
+        high_spend_low_conversion = []
+        for campaign in campaigns:
+            if campaign.spend > 100 and campaign.purchase_roas < 0.5:
+                high_spend_low_conversion.append(campaign)
+        
+        if high_spend_low_conversion:
+            alerts.append({
+                'type': 'danger',
+                'title': 'Hoge uitgaven, lage conversies',
+                'message': f'{len(high_spend_low_conversion)} campagne(s) hebben hoge uitgaven maar lage conversies',
+                'campaigns': [c.campaign_name for c in high_spend_low_conversion]
+            })
+        
+        # Check for paused campaigns with good performance
+        paused_good_performance = []
+        for campaign in campaigns:
+            if campaign.status == 'PAUSED' and campaign.purchase_roas > 2.0:
+                paused_good_performance.append(campaign)
+        
+        if paused_good_performance:
+            alerts.append({
+                'type': 'info',
+                'title': 'Gepauzeerde campagnes met goede prestaties',
+                'message': f'{len(paused_good_performance)} gepauzeerde campagne(s) hadden goede prestaties',
+                'campaigns': [c.campaign_name for c in paused_good_performance]
+            })
+        
+        return alerts
+    
+    def get_campaign_insights(self, campaign, period_name='last_30d'):
+        """Get detailed insights for a specific campaign"""
+        from .models import FacebookCampaignInsights
+        
+        period = self._get_period_config(period_name)
+        date_range = self._get_date_range(period)
+        
+        insights = FacebookCampaignInsights.objects.filter(
+            campaign=campaign,
+            date_start__gte=date_range['start'],
+            date_stop__lte=date_range['end']
+        ).order_by('date_start')
+        
+        return {
+            'campaign': {
+                'id': campaign.campaign_id,
+                'name': campaign.campaign_name,
+                'status': campaign.status,
+                'objective': campaign.objective
+            },
+            'insights': [
+                {
+                    'date': insight.date_start,
+                    'spend': float(insight.spend),
+                    'impressions': insight.impressions,
+                    'clicks': insight.clicks,
+                    'ctr': insight.ctr,
+                    'cpc': float(insight.cpc),
+                    'roas': insight.purchase_roas,
+                    'purchases': insight.purchases,
+                    'purchase_value': float(insight.purchase_value)
+                } for insight in insights
+            ],
+            'summary': self._calculate_summary_metrics(insights, []),
+            'period': period
+        }
+
+
+class FacebookInsightsService:
+    """Service class for Facebook Insights API operations"""
+    
+    def __init__(self, ad_account: FacebookAdAccount):
+        self.ad_account = ad_account
+        self.api = None
+        self._initialize_api()
+    
+    def _initialize_api(self):
+        """Initialize Facebook Ads API"""
+        try:
+            if self.ad_account.app_secret:
+                FacebookAdsApi.init(
+                    app_id=self.ad_account.app_id,
+                    app_secret=self.ad_account.app_secret,
+                    access_token=self.ad_account.access_token,
+                )
+            else:
+                FacebookAdsApi.init(
+                    app_id=self.ad_account.app_id,
+                    app_secret=None,
+                    access_token=self.ad_account.access_token,
+                )
+            self.api = FacebookAdsApi.get_default_api()
+        except Exception as e:
+            logger.error(f"Failed to initialize Facebook Insights API: {str(e)}")
+            raise
+    
+    def get_campaign_insights(self, campaign_ids, date_preset='last_30d', breakdowns=None):
+        """Get insights for campaigns"""
+        try:
+            account = AdAccount(f"act_{self.ad_account.ad_account_id}")
+            
+            fields = [
+                'campaign_id',
+                'campaign_name',
+                'date_start',
+                'date_stop',
+                'impressions',
+                'clicks',
+                'spend',
+                'reach',
+                'frequency',
+                'ctr',
+                'cpc',
+                'cpm',
+                'actions',
+                'conversions',
+                'purchase_roas',
+                'website_purchase_roas'
+            ]
+            
+            params = {
+                'time_range': {'since': '30 days ago', 'until': 'today'},
+                'date_preset': date_preset,
+                'level': 'campaign',
+                'filtering': [{'field': 'campaign.id', 'operator': 'IN', 'value': campaign_ids}]
+            }
+            
+            if breakdowns:
+                params['breakdowns'] = breakdowns
+            
+            insights = account.get_insights(fields=fields, params=params)
+            
+            return [dict(insight) for insight in insights]
+            
+        except FacebookRequestError as e:
+            logger.error(f"Failed to get campaign insights: {str(e)}")
+            return []
+    
+    def sync_insights_to_database(self, insights_data):
+        """Sync insights data to database"""
+        from .models import FacebookCampaign, FacebookCampaignInsights
+        
+        synced_count = 0
+        
+        for insight_data in insights_data:
+            try:
+                # Find the campaign
+                campaign = FacebookCampaign.objects.get(
+                    campaign_id=insight_data['campaign_id'],
+                    ad_account=self.ad_account
+                )
+                
+                # Parse dates
+                date_start = datetime.strptime(insight_data['date_start'], '%Y-%m-%d').date()
+                date_stop = datetime.strptime(insight_data['date_stop'], '%Y-%m-%d').date()
+                
+                # Parse actions and conversions
+                actions_data = insight_data.get('actions', [])
+                conversions_data = insight_data.get('conversions', [])
+                
+                # Extract specific metrics
+                purchases = self._extract_action_value(actions_data, 'purchase')
+                purchase_value = self._extract_action_value(conversions_data, 'purchase', 'value')
+                link_clicks = self._extract_action_value(actions_data, 'link_click')
+                
+                # Create or update insight
+                insight, created = FacebookCampaignInsights.objects.update_or_create(
+                    campaign=campaign,
+                    date_start=date_start,
+                    date_stop=date_stop,
+                    defaults={
+                        'impressions': int(insight_data.get('impressions', 0) or 0),
+                        'clicks': int(insight_data.get('clicks', 0) or 0),
+                        'spend': Decimal(str(insight_data.get('spend', 0) or 0)),
+                        'reach': int(insight_data.get('reach', 0) or 0),
+                        'frequency': float(insight_data.get('frequency', 0) or 0),
+                        'ctr': float(insight_data.get('ctr', 0) or 0),
+                        'cpc': Decimal(str(insight_data.get('cpc', 0) or 0)),
+                        'cpm': Decimal(str(insight_data.get('cpm', 0) or 0)),
+                        'purchase_roas': float(insight_data.get('purchase_roas', 0) or 0),
+                        'website_purchase_roas': float(insight_data.get('website_purchase_roas', 0) or 0),
+                        'purchases': purchases,
+                        'purchase_value': Decimal(str(purchase_value)),
+                        'link_clicks': link_clicks,
+                        'actions_data': actions_data,
+                        'conversions_data': conversions_data
+                    }
+                )
+                
+                synced_count += 1
+                
+            except FacebookCampaign.DoesNotExist:
+                logger.warning(f"Campaign {insight_data['campaign_id']} not found for insights sync")
+                continue
+            except Exception as e:
+                logger.error(f"Error syncing insight for campaign {insight_data.get('campaign_id')}: {str(e)}")
+                continue
+        
+        return synced_count
+    
+    def _extract_action_value(self, actions_data, action_type, value_type='1d_click'):
+        """Extract specific action value from actions data"""
+        if not actions_data:
+            return 0
+        
+        for action in actions_data:
+            if action.get('action_type') == action_type:
+                if value_type == 'value':
+                    return float(action.get('value', 0) or 0)
+                else:
+                    return int(action.get(value_type, 0) or 0)
+        
+        return 0 

@@ -1,0 +1,77 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block title %}{% translate "Delete Strategy" %}{% endblock %}
+
+{% block page_css %}
+{% vite_asset 'assets/css/site-tailwind.css' %}
+{% endblock %}
+
+{% block app %}
+<div class="container mx-auto px-4 py-8 max-w-2xl">
+  <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+    <div class="p-8">
+      <div class="flex items-center gap-4 mb-6">
+        <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+          <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-foreground">{% translate "Delete Strategy?" %}</h2>
+          <p class="text-muted-foreground mt-1">{% translate "This action cannot be undone" %}</p>
+        </div>
+      </div>
+
+      <div class="bg-muted/50 p-4 rounded-lg mb-6">
+        <p class="text-sm text-foreground mb-2">
+          {% translate "You are about to delete:" %}
+        </p>
+        <p class="font-semibold text-lg">{{ strategy.name }}</p>
+        {% if strategy.description %}
+          <p class="text-sm text-muted-foreground mt-2">{{ strategy.description }}</p>
+        {% endif %}
+      </div>
+
+      <div class="space-y-3 mb-6 text-sm">
+        <p class="text-muted-foreground">{% translate "Deleting this strategy will:" %}</p>
+        <ul class="space-y-2">
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check text-green-600 mt-0.5"></i>
+            <span>{% translate "Remove all associated campaign optimizations" %}</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-check text-green-600 mt-0.5"></i>
+            <span>{% translate "Preserve all historical logs for reference" %}</span>
+          </li>
+          <li class="flex items-start gap-2">
+            <i class="fas fa-exclamation-triangle text-orange-600 mt-0.5"></i>
+            <span class="font-medium">{% translate "Stop all automated optimization using this strategy" %}</span>
+          </li>
+        </ul>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="flex gap-3 justify-end">
+          <a href="{% url 'facebook_ads:strategy_detail' strategy.id %}"
+             class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-10 px-6"
+             data-slot="button">
+            {% translate "Cancel" %}
+          </a>
+          <button
+            type="submit"
+            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 h-10 px-6"
+            data-slot="button">
+            <i class="fas fa-trash"></i>
+            {% translate "Yes, Delete Strategy" %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% endblock %}

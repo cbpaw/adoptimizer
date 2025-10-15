@@ -8,13 +8,18 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 import json
 
-from .models import FacebookAdAccount, FacebookAd, FacebookCampaign, SelectedCampaign
+from .models import (
+    FacebookAdAccount, FacebookAd, FacebookCampaign, SelectedCampaign,
+    OptimizationStrategy, CampaignOptimization, OptimizationLog,
+    DailyPeriod, OptimizationMetrics
+)
 from .services import FacebookMarketingAPIService, ComprehensiveFacebookAPIService, get_facebook_auth_url, exchange_code_for_token
 
 logger = logging.getLogger(__name__)
@@ -737,6 +742,23 @@ def campaign_detail(request, campaign_id):
         daily_spend = round(base_spend * (0.7 + random.random() * 0.6), 2)
         spend_data.append(daily_spend)
     
+    # Get optimization info
+    campaign_optimization = CampaignOptimization.objects.filter(
+        campaign=campaign,
+        is_active=True
+    ).select_related('strategy').first()
+
+    # Get recent optimization logs
+    optimization_logs = OptimizationLog.objects.filter(
+        campaign=campaign
+    ).order_by('-check_time')[:5]
+
+    # Get available strategies for enabling optimization
+    strategies = OptimizationStrategy.objects.filter(
+        user=request.user,
+        is_active=True
+    )
+
     context = {
         'campaign': campaign,
         'ads': ads,
@@ -754,9 +776,12 @@ def campaign_detail(request, campaign_id):
         'impressions_data': impressions_data,
         'clicks_data': clicks_data,
         'spend_data': spend_data,
+        'campaign_optimization': campaign_optimization,
+        'optimization_logs': optimization_logs,
+        'strategies': strategies,
         'active_tab': 'campaigns'
     }
-    
+
     return render(request, 'facebook_ads/campaign_detail.html', context)
 
 
@@ -2222,4 +2247,475 @@ def ad_data(request, campaign_id):
         return Response({
             'success': False,
             'message': f'Error getting Ad data: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================================================
+# OPTIMIZATION STRATEGY MANAGEMENT VIEWS
+# ============================================================================
+
+@login_required
+def strategy_list(request):
+    """View to list all optimization strategies for the current user"""
+    strategies = OptimizationStrategy.objects.filter(user=request.user).order_by('-created_at')
+
+    # Count campaigns using each strategy
+    for strategy in strategies:
+        strategy.campaign_count = CampaignOptimization.objects.filter(
+            strategy=strategy,
+            is_active=True
+        ).count()
+
+    return render(request, 'facebook_ads/optimization/strategy_list.html', {
+        'strategies': strategies,
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def strategy_detail(request, strategy_id):
+    """View to show details of a specific strategy"""
+    strategy = get_object_or_404(OptimizationStrategy, id=strategy_id, user=request.user)
+
+    # Get campaigns using this strategy
+    campaign_optimizations = CampaignOptimization.objects.filter(
+        strategy=strategy,
+        is_active=True
+    ).select_related('campaign')
+
+    # Get recent logs for this strategy
+    recent_logs = OptimizationLog.objects.filter(
+        strategy=strategy
+    ).select_related('campaign').order_by('-check_time')[:20]
+
+    return render(request, 'facebook_ads/optimization/strategy_detail.html', {
+        'strategy': strategy,
+        'campaign_optimizations': campaign_optimizations,
+        'recent_logs': recent_logs,
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def strategy_create(request):
+    """View to create a new optimization strategy"""
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        description = request.POST.get('description', '')
+        is_active = request.POST.get('is_active') == 'on'
+        rules_json = request.POST.get('rules')
+
+        try:
+            import json
+            rules = json.loads(rules_json) if rules_json else {'rules': []}
+
+            strategy = OptimizationStrategy.objects.create(
+                user=request.user,
+                name=name,
+                description=description,
+                is_active=is_active,
+                rules=rules
+            )
+
+            messages.success(request, f'Strategy "{name}" created successfully!')
+            return redirect('facebook_ads:strategy_detail', strategy_id=strategy.id)
+
+        except Exception as e:
+            messages.error(request, f'Error creating strategy: {str(e)}')
+            logger.error(f"Error creating strategy: {str(e)}")
+
+    return render(request, 'facebook_ads/optimization/strategy_form.html', {
+        'mode': 'create',
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def strategy_edit(request, strategy_id):
+    """View to edit an existing optimization strategy"""
+    strategy = get_object_or_404(OptimizationStrategy, id=strategy_id, user=request.user)
+
+    if request.method == 'POST':
+        strategy.name = request.POST.get('name')
+        strategy.description = request.POST.get('description', '')
+        strategy.is_active = request.POST.get('is_active') == 'on'
+
+        rules_json = request.POST.get('rules')
+        try:
+            import json
+            strategy.rules = json.loads(rules_json) if rules_json else {'rules': []}
+            strategy.save()
+
+            messages.success(request, f'Strategy "{strategy.name}" updated successfully!')
+            return redirect('facebook_ads:strategy_detail', strategy_id=strategy.id)
+
+        except Exception as e:
+            messages.error(request, f'Error updating strategy: {str(e)}')
+            logger.error(f"Error updating strategy: {str(e)}")
+
+    import json
+    return render(request, 'facebook_ads/optimization/strategy_form.html', {
+        'mode': 'edit',
+        'strategy': strategy,
+        'rules_json': json.dumps(strategy.rules, indent=2),
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def strategy_delete(request, strategy_id):
+    """View to delete an optimization strategy"""
+    strategy = get_object_or_404(OptimizationStrategy, id=strategy_id, user=request.user)
+
+    if request.method == 'POST':
+        # Check if strategy is in use
+        active_optimizations = CampaignOptimization.objects.filter(
+            strategy=strategy,
+            is_active=True
+        ).count()
+
+        if active_optimizations > 0:
+            messages.error(
+                request,
+                f'Cannot delete strategy "{strategy.name}" - it is currently active on {active_optimizations} campaign(s). '
+                'Please disable it on all campaigns first.'
+            )
+            return redirect('facebook_ads:strategy_detail', strategy_id=strategy.id)
+
+        strategy_name = strategy.name
+        strategy.delete()
+        messages.success(request, f'Strategy "{strategy_name}" deleted successfully!')
+        return redirect('facebook_ads:strategy_list')
+
+    return render(request, 'facebook_ads/optimization/strategy_delete_confirm.html', {
+        'strategy': strategy,
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def optimization_dashboard(request):
+    """Main optimization dashboard showing all campaigns with optimization status"""
+    from django.db.models import Q, Count, Max
+    from datetime import date, timedelta
+
+    # Get date filter from query params (default to today)
+    selected_date_str = request.GET.get('date')
+    if selected_date_str:
+        try:
+            from datetime import datetime
+            selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = date.today()
+    else:
+        selected_date = date.today()
+
+    # Get all user's campaigns with optimization status
+    user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
+    campaigns = FacebookCampaign.objects.filter(
+        ad_account__in=user_accounts
+    ).select_related('ad_account').prefetch_related('optimizations')
+
+    # Add optimization info to each campaign
+    campaign_data = []
+    for campaign in campaigns:
+        active_opt = campaign.optimizations.filter(is_active=True).first()
+
+        # Get latest metrics for the selected date
+        try:
+            period = DailyPeriod.objects.get(date=selected_date)
+            metrics = OptimizationMetrics.objects.filter(
+                campaign=campaign,
+                period=period
+            ).first()
+        except (DailyPeriod.DoesNotExist, OptimizationMetrics.DoesNotExist):
+            metrics = None
+
+        # Get latest log entry
+        latest_log = OptimizationLog.objects.filter(
+            campaign=campaign
+        ).order_by('-check_time').first()
+
+        campaign_data.append({
+            'campaign': campaign,
+            'optimization': active_opt,
+            'metrics': metrics,
+            'latest_log': latest_log,
+            'has_optimization': active_opt is not None,
+        })
+
+    # Get available strategies
+    strategies = OptimizationStrategy.objects.filter(user=request.user, is_active=True)
+
+    # Summary stats
+    total_campaigns = len(campaign_data)
+    optimized_campaigns = sum(1 for c in campaign_data if c['has_optimization'])
+    active_campaigns = campaigns.filter(status='ACTIVE').count()
+
+    return render(request, 'facebook_ads/optimization/dashboard.html', {
+        'campaign_data': campaign_data,
+        'strategies': strategies,
+        'selected_date': selected_date,
+        'total_campaigns': total_campaigns,
+        'optimized_campaigns': optimized_campaigns,
+        'active_campaigns': active_campaigns,
+        'active_tab': 'optimization'
+    })
+
+
+@login_required
+def optimization_logs(request):
+    """View optimization logs with filtering"""
+    from datetime import datetime, timedelta
+
+    # Get filter parameters
+    campaign_id = request.GET.get('campaign')
+    strategy_id = request.GET.get('strategy')
+    action = request.GET.get('action')
+    date_from_str = request.GET.get('date_from')
+    date_to_str = request.GET.get('date_to')
+
+    # Base query - only logs for user's campaigns
+    user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
+    user_campaigns = FacebookCampaign.objects.filter(ad_account__in=user_accounts)
+
+    logs = OptimizationLog.objects.filter(
+        campaign__in=user_campaigns
+    ).select_related('campaign', 'strategy', 'campaign_optimization').order_by('-check_time')
+
+    # Apply filters
+    if campaign_id:
+        logs = logs.filter(campaign_id=campaign_id)
+
+    if strategy_id:
+        logs = logs.filter(strategy_id=strategy_id)
+
+    if action:
+        logs = logs.filter(action=action)
+
+    if date_from_str:
+        try:
+            date_from = datetime.strptime(date_from_str, '%Y-%m-%d')
+            logs = logs.filter(check_time__gte=date_from)
+        except ValueError:
+            pass
+
+    if date_to_str:
+        try:
+            date_to = datetime.strptime(date_to_str, '%Y-%m-%d')
+            # Add one day to include the entire end date
+            date_to = date_to + timedelta(days=1)
+            logs = logs.filter(check_time__lt=date_to)
+        except ValueError:
+            pass
+
+    # Get filter options
+    campaigns = user_campaigns.order_by('campaign_name')
+    strategies = OptimizationStrategy.objects.filter(user=request.user).order_by('name')
+    action_choices = OptimizationLog.ACTION_CHOICES
+
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(logs, 50)  # Show 50 logs per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'facebook_ads/optimization/logs.html', {
+        'logs': page_obj,
+        'campaigns': campaigns,
+        'strategies': strategies,
+        'action_choices': action_choices,
+        'filters': {
+            'campaign_id': campaign_id,
+            'strategy_id': strategy_id,
+            'action': action,
+            'date_from': date_from_str,
+            'date_to': date_to_str,
+        },
+        'active_tab': 'optimization'
+    })
+
+
+# ============================================================================
+# OPTIMIZATION API ENDPOINTS
+# ============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def enable_campaign_optimization(request):
+    """Enable optimization for a campaign with a specific strategy"""
+    campaign_id = request.data.get('campaign_id')
+    strategy_id = request.data.get('strategy_id')
+
+    try:
+        # Verify user owns the campaign
+        user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
+        campaign = FacebookCampaign.objects.get(
+            id=campaign_id,
+            ad_account__in=user_accounts
+        )
+
+        # Verify user owns the strategy
+        strategy = OptimizationStrategy.objects.get(
+            id=strategy_id,
+            user=request.user
+        )
+
+        # Check if optimization already exists (active or inactive)
+        existing = CampaignOptimization.objects.filter(
+            campaign=campaign,
+            strategy=strategy
+        ).first()
+
+        if existing:
+            # Re-enable or update existing optimization
+            if not existing.is_active:
+                existing.is_active = True
+                existing.optimization_start_date = timezone.now().date()
+                existing.save()
+                message = f'Re-enabled optimization for {campaign.campaign_name}'
+            else:
+                # Already active with this strategy
+                message = f'Optimization already active for {campaign.campaign_name}'
+        else:
+            # Check if there's an active optimization with a different strategy
+            active_optimization = CampaignOptimization.objects.filter(
+                campaign=campaign,
+                is_active=True
+            ).first()
+
+            if active_optimization:
+                # Update to new strategy
+                active_optimization.strategy = strategy
+                active_optimization.optimization_start_date = timezone.now().date()
+                active_optimization.save()
+                message = f'Updated optimization strategy for {campaign.campaign_name}'
+            else:
+                # Create new optimization
+                CampaignOptimization.objects.create(
+                    user=request.user,
+                    campaign=campaign,
+                    strategy=strategy,
+                    is_active=True
+                )
+                message = f'Enabled optimization for {campaign.campaign_name}'
+
+        return Response({
+            'success': True,
+            'message': message
+        })
+
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except OptimizationStrategy.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Strategy not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error enabling optimization: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def disable_campaign_optimization(request):
+    """Disable optimization for a campaign"""
+    campaign_id = request.data.get('campaign_id')
+
+    try:
+        from datetime import datetime
+
+        # Verify user owns the campaign
+        user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
+        campaign = FacebookCampaign.objects.get(
+            id=campaign_id,
+            ad_account__in=user_accounts
+        )
+
+        # Find and disable active optimization
+        optimization = CampaignOptimization.objects.filter(
+            campaign=campaign,
+            is_active=True
+        ).first()
+
+        if optimization:
+            optimization.is_active = False
+            optimization.date_disabled = datetime.now()
+            optimization.save()
+
+            return Response({
+                'success': True,
+                'message': f'Disabled optimization for {campaign.campaign_name}'
+            })
+        else:
+            return Response({
+                'success': False,
+                'message': 'No active optimization found for this campaign'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error disabling optimization: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def run_optimization_now(request):
+    """Manually trigger optimization check for a campaign"""
+    campaign_id = request.data.get('campaign_id')
+
+    try:
+        # Verify user owns the campaign
+        user_accounts = FacebookAdAccount.objects.filter(user=request.user, is_active=True)
+        campaign = FacebookCampaign.objects.get(
+            id=campaign_id,
+            ad_account__in=user_accounts
+        )
+
+        # Check if optimization is enabled
+        optimization = CampaignOptimization.objects.filter(
+            campaign=campaign,
+            is_active=True
+        ).first()
+
+        if not optimization:
+            return Response({
+                'success': False,
+                'message': 'Optimization is not enabled for this campaign'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Trigger Celery task to run optimization
+        from .tasks import run_single_campaign_optimization
+        run_single_campaign_optimization.delay(campaign.campaign_id)
+
+        return Response({
+            'success': True,
+            'message': f'Optimization check started for {campaign.campaign_name}'
+        })
+
+    except FacebookCampaign.DoesNotExist:
+        return Response({
+            'success': False,
+            'message': 'Campaign not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error running optimization: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

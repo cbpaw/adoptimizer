@@ -66,16 +66,17 @@
                                 {% endif %}
                             </div>
                             <div class="flex items-center gap-2">
-                                <button class="sync-account-btn cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2" 
-                                        data-slot="button" 
-                                        data-account-id="{{ account_data.account.id }}">
+                                <button class="sync-account-btn cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow-xs hover:bg-blue-700 h-9 px-4 py-2"
+                                        data-slot="button"
+                                        data-account-id="{{ account_data.account.id }}"
+                                        title="Sync campagnes met volledige metrics (budget, spend, impressions, etc.)">
                                     <i class="fas fa-sync-alt mr-2"></i>
-                                    Campagnes Synchroniseren
+                                    Sync Met Metrics
                                 </button>
                                 {% if account_data.campaigns %}
-                                    <button class="save-selection-btn cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow-xs hover:bg-green-700 h-9 px-4 py-2" 
-                                            data-slot="button" 
-                                            data-account-id="{{ account_data.account.id }}" 
+                                    <button class="save-selection-btn cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow-xs hover:bg-green-700 h-9 px-4 py-2"
+                                            data-slot="button"
+                                            data-account-id="{{ account_data.account.id }}"
                                             disabled>
                                         <i class="fas fa-save"></i>
                                         Opslaan

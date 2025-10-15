@@ -1,0 +1,310 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block title %}{% translate "Optimization Dashboard" %}{% endblock %}
+
+{% block page_css %}
+{% vite_asset 'assets/css/site-tailwind.css' %}
+{% endblock %}
+
+{% block app %}
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-3xl font-bold text-foreground">{% translate "Optimization Dashboard" %}</h1>
+      <p class="text-muted-foreground mt-2">{% translate "Monitor and manage automated campaign optimization" %}</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="{% url 'facebook_ads:optimization_logs' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-10 px-4"
+         data-slot="button">
+        <i class="fas fa-history"></i>
+        {% translate "View Logs" %}
+      </a>
+      <a href="{% url 'facebook_ads:strategy_list' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-4"
+         data-slot="button">
+        <i class="fas fa-cog"></i>
+        {% translate "Manage Strategies" %}
+      </a>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6" data-slot="card">
+      <div class="text-sm text-muted-foreground mb-2">{% translate "Total Campaigns" %}</div>
+      <div class="text-3xl font-bold">{{ total_campaigns }}</div>
+    </div>
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6" data-slot="card">
+      <div class="text-sm text-muted-foreground mb-2">{% translate "Optimized Campaigns" %}</div>
+      <div class="text-3xl font-bold text-blue-600">{{ optimized_campaigns }}</div>
+      <div class="text-xs text-muted-foreground mt-1">
+        {{ optimized_campaigns|floatformat:0 }}{% if total_campaigns > 0 %} / {{ total_campaigns }} ({% widthratio optimized_campaigns total_campaigns 100 %}%){% endif %}
+      </div>
+    </div>
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6" data-slot="card">
+      <div class="text-sm text-muted-foreground mb-2">{% translate "Active Campaigns" %}</div>
+      <div class="text-3xl font-bold text-green-600">{{ active_campaigns }}</div>
+    </div>
+  </div>
+
+  <!-- Date Filter -->
+  <div class="flex justify-between items-center mb-6">
+    <div class="flex items-center gap-3">
+      <label for="date-filter" class="text-sm font-medium">{% translate "Date:" %}</label>
+      <input
+        type="date"
+        id="date-filter"
+        value="{{ selected_date|date:'Y-m-d' }}"
+        class="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        onchange="window.location.href = '?date=' + this.value"
+      />
+    </div>
+    <div class="text-sm text-muted-foreground">
+      {% translate "Showing metrics for" %} {{ selected_date|date:"F d, Y" }}
+    </div>
+  </div>
+
+  <!-- Campaigns Table -->
+  <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+    <div class="p-6">
+      <h3 class="text-lg font-semibold mb-4">{% translate "Campaigns" %}</h3>
+
+      {% if campaign_data %}
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="border-b">
+              <tr class="text-left text-sm text-muted-foreground">
+                <th class="pb-3 font-medium">{% translate "Campaign" %}</th>
+                <th class="pb-3 font-medium">{% translate "Status" %}</th>
+                <th class="pb-3 font-medium">{% translate "Optimization" %}</th>
+                <th class="pb-3 font-medium">{% translate "Strategy" %}</th>
+                <th class="pb-3 font-medium">{% translate "Spend" %}</th>
+                <th class="pb-3 font-medium">{% translate "CPC" %}</th>
+                <th class="pb-3 font-medium">{% translate "ATC" %}</th>
+                <th class="pb-3 font-medium">{% translate "Purchases" %}</th>
+                <th class="pb-3 font-medium">{% translate "ROAS" %}</th>
+                <th class="pb-3 font-medium">{% translate "Last Check" %}</th>
+                <th class="pb-3 font-medium">{% translate "Last Action" %}</th>
+                <th class="pb-3 font-medium text-right">{% translate "Actions" %}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              {% for item in campaign_data %}
+                <tr class="text-sm hover:bg-muted/50 transition-colors" data-campaign-id="{{ item.campaign.id }}">
+                  <td class="py-3">
+                    <a href="{% url 'facebook_ads:campaign_detail' item.campaign.id %}"
+                       class="font-medium hover:text-primary">
+                      {{ item.campaign.campaign_name|truncatechars:40 }}
+                    </a>
+                  </td>
+                  <td class="py-3">
+                    <span class="px-2 py-1 rounded text-xs font-semibold
+                      {% if item.campaign.status == 'ACTIVE' %}bg-green-100 text-green-800
+                      {% elif item.campaign.status == 'PAUSED' %}bg-yellow-100 text-yellow-800
+                      {% else %}bg-gray-100 text-gray-800{% endif %}">
+                      {{ item.campaign.status }}
+                    </span>
+                  </td>
+                  <td class="py-3">
+                    {% if item.has_optimization %}
+                      <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        <i class="fas fa-check-circle text-xs"></i>
+                        {% translate "Enabled" %}
+                      </span>
+                    {% else %}
+                      <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                        <i class="fas fa-minus-circle text-xs"></i>
+                        {% translate "Disabled" %}
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.optimization %}
+                      <span class="text-xs">{{ item.optimization.strategy.name|truncatechars:20 }}</span>
+                    {% else %}
+                      <span class="text-xs text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.metrics %}
+                      €{{ item.metrics.spend }}
+                    {% else %}
+                      <span class="text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.metrics %}
+                      €{{ item.metrics.cpc }}
+                    {% else %}
+                      <span class="text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.metrics %}
+                      {{ item.metrics.add_to_carts }}
+                    {% else %}
+                      <span class="text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.metrics %}
+                      {{ item.metrics.purchases }}
+                    {% else %}
+                      <span class="text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.metrics %}
+                      {{ item.metrics.roas|floatformat:2 }}
+                    {% else %}
+                      <span class="text-muted-foreground">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3 text-xs text-muted-foreground">
+                    {% if item.latest_log %}
+                      {{ item.latest_log.check_time|timesince }} ago
+                    {% else %}
+                      {% translate "Never" %}
+                    {% endif %}
+                  </td>
+                  <td class="py-3">
+                    {% if item.latest_log %}
+                      <span class="px-2 py-1 rounded text-xs font-semibold
+                        {% if item.latest_log.action == 'PAUSE' %}bg-red-100 text-red-800
+                        {% elif item.latest_log.action == 'SCALE_UP' %}bg-green-100 text-green-800
+                        {% elif item.latest_log.action == 'SCALE_DOWN' %}bg-yellow-100 text-yellow-800
+                        {% elif item.latest_log.action == 'NO_ACTION' %}bg-gray-100 text-gray-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ item.latest_log.get_action_display }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted-foreground text-xs">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                      {% if item.has_optimization %}
+                        <button
+                          onclick="disableOptimization({{ item.campaign.id }})"
+                          class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-yellow-600 text-white shadow-xs hover:bg-yellow-700 h-8 px-3 text-xs"
+                          data-slot="button"
+                          title="{% translate 'Disable Optimization' %}">
+                          <i class="fas fa-pause text-xs"></i>
+                        </button>
+                      {% else %}
+                        <div class="relative">
+                          <select
+                            class="strategy-select flex h-8 rounded-md border border-input bg-background px-2 py-1 text-xs"
+                            data-campaign-id="{{ item.campaign.id }}">
+                            <option value="">{% translate "Select Strategy..." %}</option>
+                            {% for strategy in strategies %}
+                              <option value="{{ strategy.id }}">{{ strategy.name }}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <button
+                          onclick="enableOptimization({{ item.campaign.id }})"
+                          class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-green-600 text-white shadow-xs hover:bg-green-700 h-8 px-3 text-xs"
+                          data-slot="button"
+                          title="{% translate 'Enable Optimization' %}">
+                          <i class="fas fa-play text-xs"></i>
+                        </button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-center py-12 text-muted-foreground">
+          <i class="fas fa-inbox text-4xl mb-4"></i>
+          <p>{% translate "No campaigns found" %}</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+{% vite_asset 'assets/javascript/notification-system.js' %}
+<script>
+  function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+           document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  }
+
+  async function enableOptimization(campaignId) {
+    const selectElement = document.querySelector(`.strategy-select[data-campaign-id="${campaignId}"]`);
+    const strategyId = selectElement.value;
+
+    if (!strategyId) {
+      window.showWarning('{% translate "Please select a strategy first" %}');
+      return;
+    }
+
+    try {
+      const response = await fetch('{% url "facebook_ads:api_enable_optimization" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+          campaign_id: campaignId,
+          strategy_id: strategyId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        window.showSuccess(data.message);
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        window.showError(data.message);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      window.showError('{% translate "An error occurred while enabling optimization" %}');
+    }
+  }
+
+  async function disableOptimization(campaignId) {
+    if (!confirm('{% translate "Are you sure you want to disable optimization for this campaign?" %}')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('{% url "facebook_ads:api_disable_optimization" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+          campaign_id: campaignId
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        window.showSuccess(data.message);
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        window.showError(data.message);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      window.showError('{% translate "An error occurred while disabling optimization" %}');
+    }
+  }
+</script>
+{% endblock %}

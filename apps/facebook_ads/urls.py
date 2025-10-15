@@ -55,6 +55,22 @@ urlpatterns = [
     path('api/campaigns/alerts/', views.campaign_performance_alerts, name='api_campaign_alerts'),
     path('api/sync/trigger/', views.trigger_sync, name='api_trigger_sync'),
     path('api/sync/status/<str:task_id>/', views.sync_status, name='api_sync_status'),
+
+    # Optimization Strategy Management
+    path('optimization/strategies/', views.strategy_list, name='strategy_list'),
+    path('optimization/strategies/create/', views.strategy_create, name='strategy_create'),
+    path('optimization/strategies/<int:strategy_id>/', views.strategy_detail, name='strategy_detail'),
+    path('optimization/strategies/<int:strategy_id>/edit/', views.strategy_edit, name='strategy_edit'),
+    path('optimization/strategies/<int:strategy_id>/delete/', views.strategy_delete, name='strategy_delete'),
+
+    # Optimization Dashboard & Logs
+    path('optimization/', views.optimization_dashboard, name='optimization_dashboard'),
+    path('optimization/logs/', views.optimization_logs, name='optimization_logs'),
+
+    # Optimization API Endpoints
+    path('api/optimization/enable/', views.enable_campaign_optimization, name='api_enable_optimization'),
+    path('api/optimization/disable/', views.disable_campaign_optimization, name='api_disable_optimization'),
+    path('api/optimization/run-now/', views.run_optimization_now, name='api_run_optimization_now'),
 ]
 
 if settings.DEBUG:

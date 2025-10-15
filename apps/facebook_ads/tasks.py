@@ -283,4 +283,122 @@ def full_account_sync(account_id):
         return {'success': False, 'error': 'Account not found'}
     except Exception as e:
         logger.error(f"Failed to perform full sync for account {account_id}: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
+# ============================================================================
+# OPTIMIZATION ENGINE TASKS
+# ============================================================================
+
+@shared_task
+def run_campaign_optimization_check():
+    """
+    Main periodic task to check all campaigns with active optimization.
+    This should be run every 15-30 minutes via Celery Beat.
+    """
+    from .models import CampaignOptimization
+    from .optimization_engine import OptimizationEngine
+
+    logger.info("Starting optimization check for all active campaigns")
+
+    # Get all active campaign optimizations
+    active_optimizations = CampaignOptimization.objects.filter(
+        is_active=True,
+        strategy__is_active=True,
+        campaign__status='ACTIVE',  # Only check active campaigns
+    ).select_related('campaign', 'strategy', 'campaign__ad_account')
+
+    if not active_optimizations.exists():
+        logger.info("No active campaign optimizations found")
+        return {'success': True, 'checked_campaigns': 0}
+
+    checked_count = 0
+    success_count = 0
+    error_count = 0
+
+    for campaign_opt in active_optimizations:
+        try:
+            # Run optimization for this campaign
+            engine = OptimizationEngine(campaign_opt)
+            log_entry = engine.run_optimization()
+
+            checked_count += 1
+            if log_entry.action_successful:
+                success_count += 1
+            else:
+                error_count += 1
+
+            logger.info(
+                f"Optimization check completed for campaign {campaign_opt.campaign.campaign_id}. "
+                f"Action: {log_entry.action}, Success: {log_entry.action_successful}"
+            )
+
+        except Exception as e:
+            error_count += 1
+            logger.error(
+                f"Failed to run optimization for campaign {campaign_opt.campaign.campaign_id}: {str(e)}",
+                exc_info=True
+            )
+
+    logger.info(
+        f"Optimization check completed. Checked: {checked_count}, Success: {success_count}, Errors: {error_count}"
+    )
+
+    return {
+        'success': True,
+        'checked_campaigns': checked_count,
+        'successful_actions': success_count,
+        'failed_actions': error_count,
+    }
+
+
+@shared_task
+def run_single_campaign_optimization(campaign_id):
+    """
+    Run optimization check for a single campaign.
+    Used for manual "Run Now" triggers from the UI.
+    """
+    from .models import CampaignOptimization, FacebookCampaign
+    from .optimization_engine import OptimizationEngine
+
+    try:
+        campaign = FacebookCampaign.objects.get(campaign_id=campaign_id)
+        logger.info(f"Starting manual optimization check for campaign {campaign_id}")
+
+        # Get active optimization for this campaign
+        campaign_opt = CampaignOptimization.objects.filter(
+            campaign=campaign,
+            is_active=True,
+            strategy__is_active=True,
+        ).select_related('campaign', 'strategy', 'campaign__ad_account').first()
+
+        if not campaign_opt:
+            logger.warning(f"No active optimization found for campaign {campaign_id}")
+            return {
+                'success': False,
+                'error': 'No active optimization found for this campaign'
+            }
+
+        # Run optimization
+        engine = OptimizationEngine(campaign_opt)
+        log_entry = engine.run_optimization()
+
+        logger.info(
+            f"Manual optimization completed for campaign {campaign_id}. "
+            f"Action: {log_entry.action}, Success: {log_entry.action_successful}"
+        )
+
+        return {
+            'success': True,
+            'campaign_id': campaign_id,
+            'action': log_entry.action,
+            'action_successful': log_entry.action_successful,
+            'reason': log_entry.reason,
+        }
+
+    except FacebookCampaign.DoesNotExist:
+        logger.error(f"Campaign {campaign_id} not found")
+        return {'success': False, 'error': 'Campaign not found'}
+    except Exception as e:
+        logger.error(f"Failed to run optimization for campaign {campaign_id}: {str(e)}", exc_info=True)
         return {'success': False, 'error': str(e)} 

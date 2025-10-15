@@ -1,0 +1,360 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block title %}
+  {% if mode == 'create' %}
+    {% translate "Create Optimization Strategy" %}
+  {% else %}
+    {% translate "Edit Optimization Strategy" %}
+  {% endif %}
+{% endblock %}
+
+{% block page_css %}
+{% vite_asset 'assets/css/site-tailwind.css' %}
+{% endblock %}
+
+{% block app %}
+<div class="container mx-auto px-4 py-8 max-w-5xl">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <a href="{% url 'facebook_ads:strategy_list' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 w-9"
+         data-slot="button">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="text-3xl font-bold text-foreground">
+        {% if mode == 'create' %}
+          {% translate "Create Optimization Strategy" %}
+        {% else %}
+          {% translate "Edit Optimization Strategy" %}
+        {% endif %}
+      </h1>
+    </div>
+    <p class="text-muted-foreground">
+      {% translate "Define rules that will automatically optimize your campaigns based on performance metrics" %}
+    </p>
+  </div>
+
+  <form method="post" id="strategy-form">
+    {% csrf_token %}
+
+    <!-- Basic Information Card -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mb-6" data-slot="card">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">{% translate "Basic Information" %}</h3>
+
+        <div class="space-y-4">
+          <div>
+            <label for="name" class="block text-sm font-medium mb-2">
+              {% translate "Strategy Name" %} <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value="{% if strategy %}{{ strategy.name }}{% endif %}"
+              required
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="e.g., Aggressive CPC Optimizer"
+            />
+          </div>
+
+          <div>
+            <label for="description" class="block text-sm font-medium mb-2">
+              {% translate "Description" %}
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows="3"
+              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder="{% translate 'Describe what this strategy does...' %}"
+            >{% if strategy %}{{ strategy.description }}{% endif %}</textarea>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is_active"
+              name="is_active"
+              {% if not strategy or strategy.is_active %}checked{% endif %}
+              class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <label for="is_active" class="text-sm font-medium">
+              {% translate "Active" %} ({% translate "strategy can be applied to campaigns" %})
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rules Builder Card -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm mb-6" data-slot="card">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <div>
+            <h3 class="text-lg font-semibold">{% translate "Optimization Rules" %}</h3>
+            <p class="text-sm text-muted-foreground mt-1">
+              {% translate "Rules are evaluated in order from top to bottom" %}
+            </p>
+          </div>
+          <button
+            type="button"
+            id="add-rule-btn"
+            class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4"
+            data-slot="button">
+            <i class="fas fa-plus"></i>
+            {% translate "Add Rule" %}
+          </button>
+        </div>
+
+        <!-- Rules Container -->
+        <div id="rules-container" class="space-y-4">
+          <!-- Rules will be added here dynamically -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="rules-empty-state" class="text-center py-12 border-2 border-dashed border-border rounded-lg">
+          <i class="fas fa-rules text-4xl text-muted-foreground mb-4"></i>
+          <p class="text-muted-foreground">
+            {% translate "No rules defined yet. Click 'Add Rule' to create your first rule." %}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden field for rules JSON -->
+    <input type="hidden" id="rules" name="rules" value="">
+
+    <!-- Actions -->
+    <div class="flex justify-end gap-3">
+      <a href="{% url 'facebook_ads:strategy_list' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-10 px-6"
+         data-slot="button">
+        {% translate "Cancel" %}
+      </a>
+      <button
+        type="submit"
+        class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
+        data-slot="button">
+        <i class="fas fa-save"></i>
+        {% if mode == 'create' %}
+          {% translate "Create Strategy" %}
+        {% else %}
+          {% translate "Save Changes" %}
+        {% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Rule Template (hidden) -->
+<template id="rule-template">
+  <div class="rule-item p-4 border rounded-lg bg-background relative">
+    <button type="button" class="remove-rule-btn absolute top-2 right-2 text-red-600 hover:text-red-800">
+      <i class="fas fa-times"></i>
+    </button>
+
+    <div class="grid grid-cols-12 gap-4 items-end">
+      <!-- Spend Threshold -->
+      <div class="col-span-3">
+        <label class="block text-sm font-medium mb-2">
+          {% translate "After Spend" %}
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+          <input
+            type="number"
+            class="rule-spend-threshold flex h-10 w-full rounded-md border border-input bg-background pl-7 pr-3 py-2 text-sm"
+            placeholder="10.00"
+            step="0.01"
+            min="0"
+            required
+          />
+        </div>
+      </div>
+
+      <!-- Metric -->
+      <div class="col-span-3">
+        <label class="block text-sm font-medium mb-2">
+          {% translate "Check Metric" %}
+        </label>
+        <select class="rule-metric flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
+          <option value="">{% translate "Select..." %}</option>
+          <option value="cpc">{% translate "CPC (Cost Per Click)" %}</option>
+          <option value="ctr">{% translate "CTR (Click-Through Rate)" %}</option>
+          <option value="add_to_cart">{% translate "Add to Cart Events" %}</option>
+          <option value="purchases">{% translate "Purchase Events" %}</option>
+          <option value="roas">{% translate "ROAS (Return on Ad Spend)" %}</option>
+        </select>
+      </div>
+
+      <!-- Operator -->
+      <div class="col-span-2">
+        <label class="block text-sm font-medium mb-2">
+          {% translate "Condition" %}
+        </label>
+        <select class="rule-operator flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
+          <option value="less_than">< {% translate "Less than" %}</option>
+          <option value="less_than_or_equal">≤ {% translate "Less/Equal" %}</option>
+          <option value="greater_than">> {% translate "Greater than" %}</option>
+          <option value="greater_than_or_equal">≥ {% translate "Greater/Equal" %}</option>
+          <option value="equal">= {% translate "Equal" %}</option>
+        </select>
+      </div>
+
+      <!-- Value -->
+      <div class="col-span-2">
+        <label class="block text-sm font-medium mb-2">
+          {% translate "Value" %}
+        </label>
+        <input
+          type="number"
+          class="rule-value flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          placeholder="1.20"
+          step="0.01"
+          required
+        />
+      </div>
+
+      <!-- Action -->
+      <div class="col-span-2">
+        <label class="block text-sm font-medium mb-2">
+          {% translate "Then" %}
+        </label>
+        <select class="rule-action flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
+          <option value="keep_running">✓ {% translate "Keep Running" %}</option>
+          <option value="pause">⏸ {% translate "Pause" %}</option>
+          <option value="scale_up">↑ {% translate "Scale Up 20%" %}</option>
+          <option value="scale_down">↓ {% translate "Scale Down 20%" %}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block page_js %}
+{% vite_asset 'assets/javascript/notification-system.js' %}
+<script>
+  // Strategy form management
+  let rulesData = [];
+
+  // Load existing rules if editing
+  {% if rules_json %}
+    try {
+      const existingRules = {{ rules_json|safe }};
+      if (existingRules && existingRules.rules) {
+        rulesData = existingRules.rules;
+      }
+    } catch (e) {
+      console.error('Error loading existing rules:', e);
+    }
+  {% endif %}
+
+  function renderRules() {
+    const container = document.getElementById('rules-container');
+    const emptyState = document.getElementById('rules-empty-state');
+
+    if (!container || !emptyState) {
+      console.error('Rules container or empty state element not found');
+      return;
+    }
+
+    container.innerHTML = '';
+
+    if (rulesData.length === 0) {
+      emptyState.style.display = 'block';
+    } else {
+      emptyState.style.display = 'none';
+
+      rulesData.forEach((rule, index) => {
+        const template = document.getElementById('rule-template');
+        const ruleElement = template.content.cloneNode(true);
+
+        // Set values
+        ruleElement.querySelector('.rule-spend-threshold').value = rule.spend_threshold || '';
+        ruleElement.querySelector('.rule-metric').value = rule.metric || '';
+        ruleElement.querySelector('.rule-operator').value = rule.operator || 'less_than';
+        ruleElement.querySelector('.rule-value').value = rule.value || '';
+        ruleElement.querySelector('.rule-action').value = rule.action || 'keep_running';
+
+        // Add remove handler
+        const removeBtn = ruleElement.querySelector('.remove-rule-btn');
+        removeBtn.addEventListener('click', () => {
+          rulesData.splice(index, 1);
+          renderRules();
+        });
+
+        container.appendChild(ruleElement);
+      });
+    }
+
+    // Update hidden input
+    updateRulesInput();
+  }
+
+  function updateRulesInput() {
+    const rulesInput = document.getElementById('rules');
+    if (rulesInput) {
+      rulesInput.value = JSON.stringify({ rules: rulesData });
+    }
+  }
+
+  function collectRulesFromForm() {
+    const ruleItems = document.querySelectorAll('.rule-item');
+    rulesData = [];
+
+    ruleItems.forEach(item => {
+      const rule = {
+        spend_threshold: parseFloat(item.querySelector('.rule-spend-threshold').value),
+        metric: item.querySelector('.rule-metric').value,
+        operator: item.querySelector('.rule-operator').value,
+        value: parseFloat(item.querySelector('.rule-value').value),
+        action: item.querySelector('.rule-action').value
+      };
+      rulesData.push(rule);
+    });
+
+    updateRulesInput();
+  }
+
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', () => {
+    // Add rule button handler
+    const addRuleBtn = document.getElementById('add-rule-btn');
+    if (addRuleBtn) {
+      addRuleBtn.addEventListener('click', () => {
+        collectRulesFromForm();
+        rulesData.push({
+          spend_threshold: 10,
+          metric: 'cpc',
+          operator: 'less_than',
+          value: 1.20,
+          action: 'keep_running'
+        });
+        renderRules();
+      });
+    }
+
+    // Form submission handler
+    const strategyForm = document.getElementById('strategy-form');
+    if (strategyForm) {
+      strategyForm.addEventListener('submit', (e) => {
+        collectRulesFromForm();
+
+        if (rulesData.length === 0) {
+          e.preventDefault();
+          window.showWarning('{% translate "Please add at least one rule to your strategy" %}');
+          return false;
+        }
+      });
+    }
+
+    // Initial render
+    renderRules();
+  });
+</script>
+{% endblock %}

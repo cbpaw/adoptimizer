@@ -1,0 +1,195 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block title %}{{ strategy.name }}{% endblock %}
+
+{% block page_css %}
+{% vite_asset 'assets/css/site-tailwind.css' %}
+{% endblock %}
+
+{% block app %}
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+  <!-- Header -->
+  <div class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <a href="{% url 'facebook_ads:strategy_list' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 w-9"
+         data-slot="button">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <div class="flex-1">
+        <div class="flex items-center gap-3">
+          <h1 class="text-3xl font-bold text-foreground">{{ strategy.name }}</h1>
+          {% if strategy.is_active %}
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+              <span class="h-1.5 w-1.5 rounded-full bg-green-600"></span>
+              {% translate "Active" %}
+            </span>
+          {% else %}
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800">
+              <span class="h-1.5 w-1.5 rounded-full bg-gray-600"></span>
+              {% translate "Inactive" %}
+            </span>
+          {% endif %}
+        </div>
+        {% if strategy.description %}
+          <p class="text-muted-foreground mt-2">{{ strategy.description }}</p>
+        {% endif %}
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'facebook_ads:strategy_edit' strategy.id %}"
+           class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4"
+           data-slot="button">
+          <i class="fas fa-edit"></i>
+          {% translate "Edit" %}
+        </a>
+        <a href="{% url 'facebook_ads:strategy_delete' strategy.id %}"
+           class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 h-9 px-4"
+           data-slot="button">
+          <i class="fas fa-trash"></i>
+          {% translate "Delete" %}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid gap-6">
+    <!-- Rules Card -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">{% translate "Optimization Rules" %}</h3>
+
+        {% if strategy.rules.rules %}
+          <div class="space-y-3">
+            {% for rule in strategy.rules.rules %}
+              <div class="flex items-center gap-3 p-4 rounded-lg border bg-muted/20">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
+                  {{ forloop.counter }}
+                </div>
+                <div class="flex-1 flex items-center gap-2 text-sm">
+                  <span class="font-medium">{% translate "After" %}</span>
+                  <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-mono">€{{ rule.spend_threshold }}</span>
+                  <span class="text-muted-foreground">{% translate "spend, check if" %}</span>
+                  <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded font-semibold">{{ rule.metric|upper }}</span>
+                  <span class="text-muted-foreground">
+                    {% if rule.operator == "less_than" %}<{% elif rule.operator == "less_than_or_equal" %}≤{% elif rule.operator == "greater_than" %}>{% elif rule.operator == "greater_than_or_equal" %}≥{% else %}={% endif %}
+                  </span>
+                  <span class="px-2 py-1 bg-orange-100 text-orange-800 rounded font-mono">{{ rule.value }}</span>
+                  <span class="text-muted-foreground">→</span>
+                  <span class="px-2 py-1 rounded font-semibold
+                    {% if rule.action == 'pause' %}bg-red-100 text-red-800
+                    {% elif rule.action == 'scale_up' %}bg-green-100 text-green-800
+                    {% elif rule.action == 'scale_down' %}bg-yellow-100 text-yellow-800
+                    {% else %}bg-blue-100 text-blue-800{% endif %}">
+                    {% if rule.action == "pause" %}⏸ {% translate "PAUSE" %}
+                    {% elif rule.action == "scale_up" %}↑ {% translate "SCALE UP 20%" %}
+                    {% elif rule.action == "scale_down" %}↓ {% translate "SCALE DOWN 20%" %}
+                    {% else %}✓ {% translate "KEEP RUNNING" %}{% endif %}
+                  </span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-8 text-muted-foreground">
+            <i class="fas fa-exclamation-circle text-3xl mb-3"></i>
+            <p>{% translate "No rules defined for this strategy" %}</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Active Campaigns Card -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">
+          {% translate "Active Campaigns" %} ({{ campaign_optimizations.count }})
+        </h3>
+
+        {% if campaign_optimizations %}
+          <div class="space-y-2">
+            {% for opt in campaign_optimizations %}
+              <a href="{% url 'facebook_ads:campaign_detail' opt.campaign.id %}"
+                 class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                <div>
+                  <div class="font-medium">{{ opt.campaign.campaign_name }}</div>
+                  <div class="text-sm text-muted-foreground">
+                    {% translate "Enabled" %}: {{ opt.date_enabled|date:"M d, Y" }}
+                  </div>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="text-sm">
+                    <span class="text-muted-foreground">{% translate "Status:" %}</span>
+                    <span class="font-medium">{{ opt.campaign.status }}</span>
+                  </div>
+                  <i class="fas fa-chevron-right text-muted-foreground text-sm"></i>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-8 text-muted-foreground">
+            <i class="fas fa-info-circle text-3xl mb-3"></i>
+            <p>{% translate "This strategy is not currently applied to any campaigns" %}</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Recent Activity Card -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+      <div class="p-6">
+        <h3 class="text-lg font-semibold mb-4">{% translate "Recent Activity" %}</h3>
+
+        {% if recent_logs %}
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="border-b">
+                <tr class="text-left text-sm text-muted-foreground">
+                  <th class="pb-3 font-medium">{% translate "Time" %}</th>
+                  <th class="pb-3 font-medium">{% translate "Campaign" %}</th>
+                  <th class="pb-3 font-medium">{% translate "Action" %}</th>
+                  <th class="pb-3 font-medium">{% translate "Metrics" %}</th>
+                  <th class="pb-3 font-medium">{% translate "Rule" %}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                {% for log in recent_logs %}
+                  <tr class="text-sm">
+                    <td class="py-3">{{ log.check_time|date:"M d, H:i" }}</td>
+                    <td class="py-3">{{ log.campaign.campaign_name|truncatechars:30 }}</td>
+                    <td class="py-3">
+                      <span class="px-2 py-1 rounded text-xs font-semibold
+                        {% if log.action == 'PAUSE' %}bg-red-100 text-red-800
+                        {% elif log.action == 'SCALE_UP' %}bg-green-100 text-green-800
+                        {% elif log.action == 'SCALE_DOWN' %}bg-yellow-100 text-yellow-800
+                        {% elif log.action == 'NO_ACTION' %}bg-gray-100 text-gray-800
+                        {% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ log.get_action_display }}
+                      </span>
+                    </td>
+                    <td class="py-3 text-xs text-muted-foreground">
+                      €{{ log.spend }} | CPC: €{{ log.cpc }} | ATC: {{ log.add_to_carts }} | P: {{ log.purchases }}
+                    </td>
+                    <td class="py-3 text-xs text-muted-foreground">{{ log.rule_triggered|truncatechars:40 }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="text-center py-8 text-muted-foreground">
+            <i class="fas fa-clock text-3xl mb-3"></i>
+            <p>{% translate "No activity logged yet for this strategy" %}</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_js %}
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% endblock %}

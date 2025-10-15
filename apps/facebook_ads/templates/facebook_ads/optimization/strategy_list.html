@@ -1,0 +1,154 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load django_vite %}
+
+{% block title %}{% translate "Optimization Strategies" %}{% endblock %}
+
+{% block page_css %}
+{% vite_asset 'assets/css/site-tailwind.css' %}
+{% endblock %}
+
+{% block app %}
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+  <!-- Header -->
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-3xl font-bold text-foreground">{% translate "Optimization Strategies" %}</h1>
+      <p class="text-muted-foreground mt-2">{% translate "Define and manage automated campaign optimization rules" %}</p>
+    </div>
+    <a href="{% url 'facebook_ads:strategy_create' %}"
+       class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
+       data-slot="button">
+      <i class="fas fa-plus"></i>
+      {% translate "Create Strategy" %}
+    </a>
+  </div>
+
+  {% if strategies %}
+    <div class="grid gap-6">
+      {% for strategy in strategies %}
+        <div class="rounded-lg border bg-card text-card-foreground shadow-sm" data-slot="card">
+          <div class="p-6">
+            <div class="flex justify-between items-start mb-4">
+              <div class="flex-1">
+                <div class="flex items-center gap-3">
+                  <h3 class="text-xl font-semibold">{{ strategy.name }}</h3>
+                  {% if strategy.is_active %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+                      <span class="h-1.5 w-1.5 rounded-full bg-green-600"></span>
+                      {% translate "Active" %}
+                    </span>
+                  {% else %}
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800">
+                      <span class="h-1.5 w-1.5 rounded-full bg-gray-600"></span>
+                      {% translate "Inactive" %}
+                    </span>
+                  {% endif %}
+                </div>
+                {% if strategy.description %}
+                  <p class="text-muted-foreground mt-2">{{ strategy.description }}</p>
+                {% endif %}
+              </div>
+              <div class="flex gap-2">
+                <a href="{% url 'facebook_ads:strategy_detail' strategy.id %}"
+                   class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                   data-slot="button"
+                   title="{% translate 'View Details' %}">
+                  <i class="fas fa-eye text-sm"></i>
+                </a>
+                <a href="{% url 'facebook_ads:strategy_edit' strategy.id %}"
+                   class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3"
+                   data-slot="button"
+                   title="{% translate 'Edit' %}">
+                  <i class="fas fa-edit text-sm"></i>
+                </a>
+                <a href="{% url 'facebook_ads:strategy_delete' strategy.id %}"
+                   class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 h-9 px-3"
+                   data-slot="button"
+                   title="{% translate 'Delete' %}">
+                  <i class="fas fa-trash text-sm"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Strategy Stats -->
+            <div class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t">
+              <div>
+                <div class="text-sm text-muted-foreground">{% translate "Rules" %}</div>
+                <div class="text-2xl font-semibold mt-1">
+                  {{ strategy.rules.rules|length|default:0 }}
+                </div>
+              </div>
+              <div>
+                <div class="text-sm text-muted-foreground">{% translate "Active Campaigns" %}</div>
+                <div class="text-2xl font-semibold mt-1">
+                  {{ strategy.campaign_count }}
+                </div>
+              </div>
+              <div>
+                <div class="text-sm text-muted-foreground">{% translate "Created" %}</div>
+                <div class="text-sm font-medium mt-1">
+                  {{ strategy.created_at|date:"M d, Y" }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Rules Preview -->
+            {% if strategy.rules.rules %}
+              <div class="mt-6 pt-6 border-t">
+                <h4 class="text-sm font-medium mb-3">{% translate "Rules Preview" %}</h4>
+                <div class="space-y-2">
+                  {% for rule in strategy.rules.rules|slice:":3" %}
+                    <div class="flex items-center gap-2 text-sm p-3 rounded-lg bg-muted/50">
+                      <i class="fas fa-arrow-right text-muted-foreground text-xs"></i>
+                      <span>{% translate "After" %} <strong>€{{ rule.spend_threshold }}</strong> {% translate "spend" %}</span>
+                      <span class="text-muted-foreground">→</span>
+                      <span>{{ rule.metric|upper }} {{ rule.operator|default:"must be" }} <strong>{{ rule.value }}</strong></span>
+                      <span class="text-muted-foreground">→</span>
+                      <span class="font-medium">
+                        {% if rule.action == "pause" %}
+                          <span class="text-red-600">{% translate "PAUSE" %}</span>
+                        {% elif rule.action == "scale_up" %}
+                          <span class="text-green-600">{% translate "SCALE UP" %}</span>
+                        {% else %}
+                          <span class="text-blue-600">{% translate "KEEP RUNNING" %}</span>
+                        {% endif %}
+                      </span>
+                    </div>
+                  {% endfor %}
+                  {% if strategy.rules.rules|length > 3 %}
+                    <div class="text-sm text-muted-foreground text-center py-2">
+                      {% translate "And" %} {{ strategy.rules.rules|length|add:"-3" }} {% translate "more rule(s)" %}...
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <!-- Empty State -->
+    <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-12 text-center" data-slot="card">
+      <div class="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+        <i class="fas fa-robot text-4xl text-muted-foreground"></i>
+      </div>
+      <h3 class="text-xl font-semibold mb-2">{% translate "No Optimization Strategies" %}</h3>
+      <p class="text-muted-foreground mb-6 max-w-md mx-auto">
+        {% translate "Create your first optimization strategy to automatically manage your campaign budgets based on performance metrics." %}
+      </p>
+      <a href="{% url 'facebook_ads:strategy_create' %}"
+         class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 px-6"
+         data-slot="button">
+        <i class="fas fa-plus"></i>
+        {% translate "Create Your First Strategy" %}
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block page_js %}
+{% vite_asset 'assets/javascript/notification-system.js' %}
+{% endblock %}

@@ -249,10 +249,31 @@
                                     
                                     <!-- Card Footer - Only Action Buttons -->
                                     <div class="px-6 pb-6" data-slot="card-footer">
-                                        <div class="pt-6 border-t mt-4">
-                                            <!-- Actions Row -->
+                                        <div class="pt-6 border-t mt-4 space-y-3">
+                                            <!-- Sync Actions Row -->
                                             <div class="flex gap-2">
-                                                <button 
+                                                <button
+                                                    onclick="comprehensiveSyncCampaigns('{{ account.id }}')"
+                                                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-blue-600 text-white shadow-xs hover:bg-blue-700 h-9 px-3 flex-1"
+                                                    data-slot="button"
+                                                    title="{% translate 'Sync campagnes met volledige metrics' %}"
+                                                >
+                                                    <i class="fas fa-sync-alt text-xs"></i>
+                                                    {% translate "Sync Campagnes" %}
+                                                </button>
+                                                <button
+                                                    onclick="comprehensiveSyncAds('{{ account.id }}')"
+                                                    class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-purple-600 text-white shadow-xs hover:bg-purple-700 h-9 px-3 flex-1"
+                                                    data-slot="button"
+                                                    title="{% translate 'Sync ads met volledige metrics' %}"
+                                                >
+                                                    <i class="fas fa-ad text-xs"></i>
+                                                    {% translate "Sync Ads" %}
+                                                </button>
+                                            </div>
+                                            <!-- Management Actions Row -->
+                                            <div class="flex gap-2">
+                                                <button
                                                     onclick="testAccountConnection('{{ account.id }}')"
                                                     class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 flex-1"
                                                     data-slot="button"
@@ -261,7 +282,7 @@
                                                     <i class="fas fa-link text-xs"></i>
                                                     {% translate "Test" %}
                                                 </button>
-                                                <button 
+                                                <button
                                                     class="cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,box-shadow] disabled:pointer-events-none disabled:opacity-50 bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 h-9 px-3 flex-1 disconnect-account-btn"
                                                     data-slot="button"
                                                     data-account-id="{{ account.id }}"

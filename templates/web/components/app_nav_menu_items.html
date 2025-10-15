@@ -15,6 +15,34 @@
   </a>
 </li>
 <li>
+  <details {% if active_tab == 'optimization' %}open{% endif %}>
+    <summary {% if active_tab == 'optimization' %}class="menu-active"{% endif %}>
+      <i class="fa fa-chart-line h-4 w-4"></i>
+      {% translate "Optimization" %}
+    </summary>
+    <ul>
+      <li>
+        <a href="{% url 'facebook_ads:optimization_dashboard' %}">
+          <i class="fa fa-dashboard h-4 w-4"></i>
+          {% translate "Dashboard" %}
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'facebook_ads:strategy_list' %}">
+          <i class="fa fa-list h-4 w-4"></i>
+          {% translate "Strategies" %}
+        </a>
+      </li>
+      <li>
+        <a href="{% url 'facebook_ads:optimization_logs' %}">
+          <i class="fa fa-file-text h-4 w-4"></i>
+          {% translate "Logs" %}
+        </a>
+      </li>
+    </ul>
+  </details>
+</li>
+<li>
   <a href="{% url 'facebook_ads:settings' %}" {% if active_tab == 'settings' %}class="menu-active"{% endif %}>
     <i class="fa fa-cog h-4 w-4"></i>
     {% translate "Settings" %}

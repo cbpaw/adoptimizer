@@ -173,13 +173,14 @@ class CampaignSelectionManager {
      */
     async handleSyncAccount(accountId, button) {
         const originalContent = button.innerHTML;
-        
+
         // Show loading state
         button.disabled = true;
         button.innerHTML = '<span class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></span>Synchroniseren...';
 
         try {
-            const response = await fetch('/facebook-ads/api/fetch-campaigns-for-account/', {
+            // Use comprehensive sync endpoint for full campaign data with metrics
+            const response = await fetch('/facebook-ads/api/comprehensive-sync-campaigns/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -193,16 +194,12 @@ class CampaignSelectionManager {
             if (data.success) {
                 // Record sync attempt using the sync manager
                 if (window.campaignSyncManager) {
-                    window.campaignSyncManager.recordSyncAttempt(accountId, data.campaigns_synced);
+                    window.campaignSyncManager.recordSyncAttempt(accountId, data.synced_count);
                 }
 
-                // Show appropriate notification using global notification system
-                if (data.campaigns_synced === 0) {
-                    window.showWarning(`Geen campagnes gevonden voor ${data.account_name}. Het account heeft mogelijk geen actieve campagnes.`);
-                } else {
-                    window.showSuccess(`${data.campaigns_synced} campagne(s) succesvol gesynchroniseerd voor ${data.account_name}!`);
-                }
-                
+                // Show success notification with data types
+                window.showSuccess(`${data.synced_count} campagne(s) succesvol gesynchroniseerd voor ${data.account_name} met volledige metrics!\n\nData types:\n${data.data_types.join('\n')}`);
+
                 // Refresh campaign data
                 setTimeout(() => {
                     this.refreshAccountCampaigns(accountId);

@@ -798,6 +798,70 @@ class FacebookSettingsManager {
     }
 
     /**
+     * Comprehensive sync campaigns
+     * @param {string} accountId - Account ID to sync
+     */
+    async comprehensiveSyncCampaigns(accountId) {
+        console.log('Starting comprehensive campaign sync for account:', accountId);
+
+        try {
+            window.showInfo('Campagnes synchroniseren... Dit kan enkele seconden duren.');
+
+            const response = await fetch('/facebook-ads/api/comprehensive-sync-campaigns/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.csrfToken
+                },
+                body: JSON.stringify({ account_id: accountId })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.showSuccess(`Succesvol! ${data.synced_count} campagnes gesynchroniseerd met volledige metrics.\n\nData types:\n${data.data_types.join('\n')}`);
+            } else {
+                window.showError(`Synchronisatie mislukt: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error syncing campaigns:', error);
+            window.showError('Er is een fout opgetreden bij het synchroniseren van campagnes');
+        }
+    }
+
+    /**
+     * Comprehensive sync ads
+     * @param {string} accountId - Account ID to sync
+     */
+    async comprehensiveSyncAds(accountId) {
+        console.log('Starting comprehensive ads sync for account:', accountId);
+
+        try {
+            window.showInfo('Ads synchroniseren... Dit kan enkele seconden duren.');
+
+            const response = await fetch('/facebook-ads/api/comprehensive-sync-ads/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.csrfToken
+                },
+                body: JSON.stringify({ account_id: accountId })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.showSuccess(`Succesvol! ${data.synced_count} ads gesynchroniseerd met volledige metrics.\n\nData types:\n${data.data_types.join('\n')}`);
+            } else {
+                window.showError(`Synchronisatie mislukt: ${data.message}`);
+            }
+        } catch (error) {
+            console.error('Error syncing ads:', error);
+            window.showError('Er is een fout opgetreden bij het synchroniseren van ads');
+        }
+    }
+
+    /**
      * Attach global functions for onclick handlers
      */
     attachGlobalFunctions() {
@@ -813,7 +877,11 @@ class FacebookSettingsManager {
         // window.connectSelectedAccountsFromModal
         // window.closeDisconnectModal
         // window.confirmDisconnectAccount
-        
+
+        // Comprehensive sync functions
+        window.comprehensiveSyncCampaigns = (accountId) => this.comprehensiveSyncCampaigns(accountId);
+        window.comprehensiveSyncAds = (accountId) => this.comprehensiveSyncAds(accountId);
+
         console.log('Facebook Settings Manager initialized successfully');
     }
 }

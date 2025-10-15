@@ -796,7 +796,7 @@ class FacebookMarketingAPIService:
                         'adset_id': adset_data.get('id', ''),
                         'adset_name': adset_data.get('name', ''),
                         'status': ad_data.get('status', ''),
-                        'objective': campaign_data.get('objective', ''),
+                        'campaign_objective': campaign_data.get('objective', ''),
                         'impressions': impressions,
                         'clicks': clicks,
                         'spend': spend,

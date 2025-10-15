@@ -1,13 +1,18 @@
 from django.contrib import admin
 from .models import (
-    FacebookAdAccount, 
-    FacebookCampaign, 
-    SelectedCampaign, 
+    FacebookAdAccount,
+    FacebookCampaign,
+    SelectedCampaign,
     FacebookAd,
     FacebookAdSet,
     FacebookCampaignInsights,
     FacebookAdInsights,
-    DashboardPeriod
+    DashboardPeriod,
+    OptimizationStrategy,
+    CampaignOptimization,
+    OptimizationLog,
+    DailyPeriod,
+    OptimizationMetrics,
 )
 
 
@@ -273,7 +278,7 @@ class DashboardPeriodAdmin(admin.ModelAdmin):
     search_fields = ['name', 'display_name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['sort_order', 'name']
-    
+
     fieldsets = (
         ('Period Configuration', {
             'fields': ('name', 'display_name', 'days', 'date_preset', 'sort_order')
@@ -282,3 +287,113 @@ class DashboardPeriodAdmin(admin.ModelAdmin):
             'fields': ('is_custom', 'is_active'),
         }),
     )
+
+
+@admin.register(OptimizationStrategy)
+class OptimizationStrategyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'user', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at', 'user']
+    search_fields = ['name', 'description', 'user__email']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ('Strategy Information', {
+            'fields': ('user', 'name', 'description', 'is_active')
+        }),
+        ('Rules Configuration', {
+            'fields': ('rules',),
+            'description': 'JSON configuration for optimization rules'
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user')
+
+
+@admin.register(CampaignOptimization)
+class CampaignOptimizationAdmin(admin.ModelAdmin):
+    list_display = ['campaign', 'strategy', 'user', 'is_active', 'date_enabled', 'optimization_start_date']
+    list_filter = ['is_active', 'date_enabled', 'optimization_start_date', 'user']
+    search_fields = ['campaign__campaign_name', 'strategy__name', 'user__email']
+    readonly_fields = ['date_enabled', 'created_at', 'updated_at']
+    date_hierarchy = 'date_enabled'
+
+    fieldsets = (
+        ('Campaign & Strategy', {
+            'fields': ('user', 'campaign', 'strategy')
+        }),
+        ('Status', {
+            'fields': ('is_active', 'optimization_start_date')
+        }),
+        ('Timestamps', {
+            'fields': ('date_enabled', 'date_disabled', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'campaign', 'strategy')
+
+
+@admin.register(OptimizationLog)
+class OptimizationLogAdmin(admin.ModelAdmin):
+    list_display = ['campaign', 'strategy', 'action', 'check_time', 'spend', 'cpc', 'add_to_carts', 'purchases', 'roas', 'action_successful']
+    list_filter = ['action', 'action_successful', 'check_time', 'strategy']
+    search_fields = ['campaign__campaign_name', 'strategy__name', 'rule_triggered', 'reason']
+    readonly_fields = ['check_time', 'created_at', 'updated_at']
+    date_hierarchy = 'check_time'
+
+    fieldsets = (
+        ('Campaign & Strategy', {
+            'fields': ('campaign_optimization', 'campaign', 'strategy')
+        }),
+        ('Check Information', {
+            'fields': ('check_time', 'action', 'rule_triggered', 'reason')
+        }),
+        ('Metrics Snapshot', {
+            'fields': ('spend', 'cpc', 'ctr', 'impressions', 'clicks', 'add_to_carts', 'purchases', 'roas'),
+            'classes': ('collapse',)
+        }),
+        ('Result', {
+            'fields': ('action_successful', 'error_message')
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'strategy', 'campaign_optimization')
+
+
+@admin.register(DailyPeriod)
+class DailyPeriodAdmin(admin.ModelAdmin):
+    list_display = ['date', 'created_at']
+    search_fields = ['date']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'date'
+
+
+@admin.register(OptimizationMetrics)
+class OptimizationMetricsAdmin(admin.ModelAdmin):
+    list_display = ['campaign', 'period', 'spend', 'cpc', 'ctr', 'add_to_carts', 'purchases', 'roas', 'campaign_status']
+    list_filter = ['period__date', 'campaign_status', 'campaign']
+    search_fields = ['campaign__campaign_name']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'period__date'
+
+    fieldsets = (
+        ('Campaign & Period', {
+            'fields': ('campaign', 'period', 'campaign_status')
+        }),
+        ('Core Metrics', {
+            'fields': ('spend', 'cpc', 'cpm', 'ctr', 'impressions', 'clicks')
+        }),
+        ('Conversion Metrics', {
+            'fields': ('add_to_carts', 'purchases', 'purchase_value', 'roas')
+        }),
+    )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('campaign', 'period')

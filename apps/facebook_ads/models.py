@@ -369,3 +369,163 @@ class FacebookAdInsights(BaseModel):
     
     def __str__(self):
         return f"{self.ad.ad_name} - {self.date_start} to {self.date_stop}"
+
+
+class OptimizationStrategy(BaseModel):
+    """Model to define reusable campaign optimization strategies"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='optimization_strategies')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    # Strategy rules stored as JSON
+    # Example structure:
+    # {
+    #   "rules": [
+    #     {
+    #       "spend_threshold": 10.00,
+    #       "metric": "cpc",
+    #       "operator": "less_than",
+    #       "value": 1.20,
+    #       "action": "keep_running"
+    #     },
+    #     {
+    #       "spend_threshold": 20.00,
+    #       "metric": "add_to_cart",
+    #       "operator": "greater_than_or_equal",
+    #       "value": 1,
+    #       "action": "keep_running",
+    #       "else_action": "pause"
+    #     }
+    #   ]
+    # }
+    rules = models.JSONField(default=dict)
+
+    class Meta:
+        verbose_name = "Optimization Strategy"
+        verbose_name_plural = "Optimization Strategies"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"
+
+
+class CampaignOptimization(BaseModel):
+    """Links campaigns to optimization strategies"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='campaign_optimizations')
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='optimizations')
+    strategy = models.ForeignKey(OptimizationStrategy, on_delete=models.CASCADE, related_name='campaign_links')
+    is_active = models.BooleanField(default=True)
+    date_enabled = models.DateTimeField(auto_now_add=True)
+    date_disabled = models.DateTimeField(null=True, blank=True)
+
+    # Track when the campaign started for this optimization
+    optimization_start_date = models.DateField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Campaign Optimization"
+        verbose_name_plural = "Campaign Optimizations"
+        unique_together = ['campaign', 'strategy']
+        ordering = ['-date_enabled']
+
+    def __str__(self):
+        return f"{self.campaign.campaign_name} - {self.strategy.name}"
+
+
+class OptimizationLog(BaseModel):
+    """Logs all optimization checks and actions taken"""
+    ACTION_CHOICES = [
+        ('KEEP_RUNNING', 'Keep Running'),
+        ('PAUSE', 'Pause Campaign'),
+        ('SCALE_UP', 'Scale Up Budget'),
+        ('SCALE_DOWN', 'Scale Down Budget'),
+        ('NO_ACTION', 'No Action Needed'),
+    ]
+
+    campaign_optimization = models.ForeignKey(CampaignOptimization, on_delete=models.CASCADE, related_name='logs')
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='optimization_logs')
+    strategy = models.ForeignKey(OptimizationStrategy, on_delete=models.CASCADE, related_name='logs')
+
+    # Check information
+    check_time = models.DateTimeField(auto_now_add=True)
+
+    # Metrics snapshot at time of check
+    spend = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cpc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ctr = models.FloatField(default=0)
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    add_to_carts = models.IntegerField(default=0)
+    purchases = models.IntegerField(default=0)
+    roas = models.FloatField(default=0)
+
+    # Action taken
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    rule_triggered = models.CharField(max_length=255, blank=True)  # Which rule caused this action
+    reason = models.TextField(blank=True)  # Detailed reason for the action
+
+    # Success/failure tracking
+    action_successful = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Optimization Log"
+        verbose_name_plural = "Optimization Logs"
+        ordering = ['-check_time']
+        indexes = [
+            models.Index(fields=['campaign', 'check_time']),
+            models.Index(fields=['strategy', 'check_time']),
+            models.Index(fields=['check_time']),
+        ]
+
+    def __str__(self):
+        return f"{self.campaign.campaign_name} - {self.action} - {self.check_time.strftime('%Y-%m-%d %H:%M')}"
+
+
+class DailyPeriod(BaseModel):
+    """Model to represent a daily period for metrics tracking"""
+    date = models.DateField(unique=True)
+
+    class Meta:
+        verbose_name = "Daily Period"
+        verbose_name_plural = "Daily Periods"
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"Period: {self.date}"
+
+
+class OptimizationMetrics(BaseModel):
+    """Stores daily metrics snapshot for campaigns under optimization"""
+    campaign = models.ForeignKey(FacebookCampaign, on_delete=models.CASCADE, related_name='optimization_metrics')
+    period = models.ForeignKey(DailyPeriod, on_delete=models.CASCADE, related_name='campaign_metrics')
+
+    # Core metrics
+    spend = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cpc = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cpm = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    ctr = models.FloatField(default=0)
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+
+    # Conversion metrics
+    add_to_carts = models.IntegerField(default=0)
+    purchases = models.IntegerField(default=0)
+    purchase_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    roas = models.FloatField(default=0)
+
+    # Campaign status at time of snapshot
+    campaign_status = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        verbose_name = "Optimization Metrics"
+        verbose_name_plural = "Optimization Metrics"
+        unique_together = ['campaign', 'period']
+        ordering = ['-period__date']
+        indexes = [
+            models.Index(fields=['campaign', 'period']),
+            models.Index(fields=['period']),
+        ]
+
+    def __str__(self):
+        return f"{self.campaign.campaign_name} - {self.period.date}"

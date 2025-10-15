@@ -1,0 +1,1434 @@
+{
+  "info": {
+    "name": "AdOptimizer - Complete API Collection",
+    "description": "Complete API collection for AdOptimizer application including Authentication, Dashboard, Campaigns, Settings, and Facebook Meta API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "adoptimizer-complete-api-collection",
+    "version": {
+      "major": 2,
+      "minor": 1,
+      "patch": 0
+    }
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "Base URL for the AdOptimizer API"
+    },
+    {
+      "key": "allauthBaseUrl",
+      "value": "http://localhost:8000/_allauth/browser/v1",
+      "type": "string",
+      "description": "Base URL for Allauth Headless API"
+    },
+    {
+      "key": "facebookApiUrl",
+      "value": "https://graph.facebook.com/v23.0",
+      "type": "string",
+      "description": "Facebook Graph API base URL"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "Authentication token for AdOptimizer API"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string",
+      "description": "CSRF token for authentication"
+    },
+    {
+      "key": "sessionToken",
+      "value": "",
+      "type": "string",
+      "description": "Session token from allauth login"
+    },
+    {
+      "key": "facebookAccessToken",
+      "value": "",
+      "type": "string",
+      "description": "Facebook access token for Meta API calls"
+    },
+    {
+      "key": "adAccountId",
+      "value": "",
+      "type": "string",
+      "description": "Facebook Ad Account ID (without act_ prefix)"
+    },
+    {
+      "key": "campaignId",
+      "value": "",
+      "type": "string",
+      "description": "Facebook Campaign ID"
+    },
+    {
+      "key": "adsetId",
+      "value": "",
+      "type": "string",
+      "description": "Facebook AdSet ID"
+    },
+    {
+      "key": "adId",
+      "value": "",
+      "type": "string",
+      "description": "Facebook Ad ID"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication",
+      "description": "Authentication endpoints for login, registration, and user management using Allauth Headless API",
+      "item": [
+        {
+          "name": "Get CSRF Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Get CSRF token from the main page"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Extract CSRF token from cookies",
+                  "const csrfCookie = pm.cookies.get('csrftoken');",
+                  "if (csrfCookie) {",
+                  "    pm.environment.set('csrfToken', csrfCookie);",
+                  "    console.log('CSRF token set:', csrfCookie);",
+                  "} else {",
+                  "    console.log('No CSRF token found in cookies');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Auth Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token if available"
+              }
+            ],
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/session",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "session"]
+            },
+            "description": "Get current authentication status"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Extract and set session token if present",
+                  "if (pm.response.json().meta && pm.response.json().meta.session_token) {",
+                  "    pm.environment.set('sessionToken', pm.response.json().meta.session_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token if available"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"your_email@example.com\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/login",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "User login endpoint using Allauth Headless API"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Extract and set session token from response",
+                  "if (pm.response.json().meta && pm.response.json().meta.session_token) {",
+                  "    pm.environment.set('sessionToken', pm.response.json().meta.session_token);",
+                  "    console.log('Session token set:', pm.response.json().meta.session_token);",
+                  "}",
+                  "",
+                  "// Test successful login",
+                  "pm.test('Login successful', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal(200);",
+                  "    pm.expect(pm.response.json().meta.is_authenticated).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token if available"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"new_user@example.com\",\n  \"password\": \"securepassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/signup",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "signup"]
+            },
+            "description": "User registration endpoint using Allauth Headless API"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Extract and set session token from response",
+                  "if (pm.response.json().meta && pm.response.json().meta.session_token) {",
+                  "    pm.environment.set('sessionToken', pm.response.json().meta.session_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token required for logout"
+              }
+            ],
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/session",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "session"]
+            },
+            "description": "User logout endpoint using Allauth Headless API"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Clear session token on logout",
+                  "pm.environment.set('sessionToken', '');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request Password Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/password/request",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "password", "request"]
+            },
+            "description": "Request password reset using Allauth Headless API"
+          }
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"reset_code_from_email\",\n  \"password\": \"new_password_123\"\n}"
+            },
+            "url": {
+              "raw": "{{allauthBaseUrl}}/auth/password/reset",
+              "host": ["{{allauthBaseUrl}}"],
+              "path": ["auth", "password", "reset"]
+            },
+            "description": "Reset password with code using Allauth Headless API"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Dashboard",
+      "description": "Dashboard endpoints for overview data and analytics",
+      "item": [
+        {
+          "name": "Get Dashboard Data",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/dashboard/data/?period=last_7d&account_ids=1,2",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "dashboard", "data", ""],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "last_7d",
+                  "description": "Period: today, yesterday, last_7d, last_14d, last_30d, this_month, last_month"
+                },
+                {
+                  "key": "account_ids",
+                  "value": "1,2",
+                  "description": "Optional: comma-separated account IDs to filter"
+                }
+              ]
+            },
+            "description": "Get dashboard summary data with period filtering"
+          }
+        },
+        {
+          "name": "Get Dashboard Periods",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/dashboard/periods/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "dashboard", "periods", ""]
+            },
+            "description": "Get available dashboard periods"
+          }
+        },
+        {
+          "name": "Get Campaign Trends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/campaigns/trends/?period=last_30d&campaign_ids={{campaignId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "campaigns", "trends", ""],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "last_30d",
+                  "description": "Period for trends data"
+                },
+                {
+                  "key": "campaign_ids",
+                  "value": "{{campaignId}}",
+                  "description": "Optional: comma-separated campaign IDs"
+                }
+              ]
+            },
+            "description": "Get campaign trends data for charts"
+          }
+        },
+        {
+          "name": "Get Performance Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/campaigns/alerts/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "campaigns", "alerts", ""]
+            },
+            "description": "Get performance alerts for campaigns"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎯 Campaigns",
+      "description": "Campaign management endpoints",
+      "item": [
+        {
+          "name": "Get Campaign Insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/campaigns/{{campaignId}}/insights/?period=last_30d",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "campaigns", "{{campaignId}}", "insights", ""],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "last_30d",
+                  "description": "Period for insights data"
+                }
+              ]
+            },
+            "description": "Get detailed insights for a specific campaign"
+          }
+        },
+        {
+          "name": "Get Campaign AdSets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/campaigns/{{campaignId}}/adsets/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "campaigns", "{{campaignId}}", "adsets", ""]
+            },
+            "description": "Get AdSets for a specific campaign"
+          }
+        },
+        {
+          "name": "Get Campaign Ads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/campaigns/{{campaignId}}/ads/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "campaigns", "{{campaignId}}", "ads", ""]
+            },
+            "description": "Get Ads for a specific campaign"
+          }
+        },
+        {
+          "name": "Fetch Campaigns from Facebook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"{{adAccountId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/fetch-campaigns-for-account/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "fetch-campaigns-for-account", ""]
+            },
+            "description": "Fetch campaigns from Facebook for a specific account"
+          }
+        },
+        {
+          "name": "Get Account Campaigns",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/get-account-campaigns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "get-account-campaigns", ""]
+            },
+            "description": "Get campaigns for user's connected accounts"
+          }
+        },
+        {
+          "name": "Pause Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaignId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/pause-campaign/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "pause-campaign", ""]
+            },
+            "description": "Pause a Facebook campaign"
+          }
+        },
+        {
+          "name": "Resume Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"campaign_id\": \"{{campaignId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/resume-campaign/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "resume-campaign", ""]
+            },
+            "description": "Resume a paused Facebook campaign"
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Settings & Account Management",
+      "description": "Settings and account management endpoints",
+      "item": [
+        {
+          "name": "Connect Facebook Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"access_token\": \"{{facebookAccessToken}}\",\n  \"account_id\": \"{{adAccountId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/connect-account/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "connect-account", ""]
+            },
+            "description": "Connect a Facebook ad account"
+          }
+        },
+        {
+          "name": "Disconnect Facebook Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/disconnect-account/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "disconnect-account", ""]
+            },
+            "description": "Disconnect a Facebook ad account"
+          }
+        },
+        {
+          "name": "Test Account Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/test-account-connection/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "test-account-connection", ""]
+            },
+            "description": "Test Facebook account connection"
+          }
+        },
+        {
+          "name": "Trigger Sync",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sync_type\": \"full\",\n  \"account_id\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/sync/trigger/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "sync", "trigger", ""]
+            },
+            "description": "Trigger manual sync for accounts. sync_type: campaigns, full. account_id is optional"
+          }
+        },
+        {
+          "name": "Get Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Session-Token",
+                "value": "{{sessionToken}}",
+                "description": "Session token from allauth login"
+              },
+              {
+                "key": "X-CSRFToken",
+                "value": "{{csrfToken}}",
+                "description": "CSRF token for authentication"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/sync/status/task_id_here/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "sync", "status", "task_id_here", ""]
+            },
+            "description": "Get sync task status by task ID"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📱 Facebook Meta API - Direct Calls",
+      "description": "Direct Facebook Marketing API calls",
+      "item": [
+        {
+          "name": "Get Ad Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/me/adaccounts?access_token={{facebookAccessToken}}&fields=id,name,account_status,currency,timezone_name,amount_spent,balance",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["me", "adaccounts"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,name,account_status,currency,timezone_name,amount_spent,balance"
+                }
+              ]
+            },
+            "description": "Get all ad accounts for the authenticated user"
+          }
+        },
+        {
+          "name": "Get Campaign List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/campaigns?access_token={{facebookAccessToken}}&fields=id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "campaigns"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,name,status,effective_status,objective,daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get campaigns for a specific ad account"
+          }
+        },
+        {
+          "name": "Get Campaign Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=campaign&date_preset=last_7d&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,website_purchase_roas,actions,conversions&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "campaign"
+                },
+                {
+                  "key": "date_preset",
+                  "value": "last_7d",
+                  "description": "Options: today, yesterday, last_7d, last_14d, last_30d, this_month, last_month"
+                },
+                {
+                  "key": "fields",
+                  "value": "campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,website_purchase_roas,actions,conversions"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get campaign insights with performance metrics"
+          }
+        },
+        {
+          "name": "Get AdSet List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/{{campaignId}}/adsets?access_token={{facebookAccessToken}}&fields=id,name,status,effective_status,daily_budget,lifetime_budget,bid_amount,optimization_goal,billing_event,targeting,start_time,end_time,created_time,updated_time&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["{{campaignId}}", "adsets"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,name,status,effective_status,daily_budget,lifetime_budget,bid_amount,optimization_goal,billing_event,targeting,start_time,end_time,created_time,updated_time"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get AdSets for a specific campaign"
+          }
+        },
+        {
+          "name": "Get AdSet Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=adset&date_preset=last_7d&fields=adset_id,adset_name,campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "adset"
+                },
+                {
+                  "key": "date_preset",
+                  "value": "last_7d"
+                },
+                {
+                  "key": "fields",
+                  "value": "adset_id,adset_name,campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get AdSet insights with performance metrics"
+          }
+        },
+        {
+          "name": "Get Ad List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/{{adsetId}}/ads?access_token={{facebookAccessToken}}&fields=id,name,status,effective_status,creative,adset_id,campaign_id,created_time,updated_time&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["{{adsetId}}", "ads"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,name,status,effective_status,creative,adset_id,campaign_id,created_time,updated_time"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get Ads for a specific AdSet"
+          }
+        },
+        {
+          "name": "Get Ad Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=ad&date_preset=last_7d&fields=ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions,quality_ranking,engagement_rate_ranking,conversion_rate_ranking&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "ad"
+                },
+                {
+                  "key": "date_preset",
+                  "value": "last_7d"
+                },
+                {
+                  "key": "fields",
+                  "value": "ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions,quality_ranking,engagement_rate_ranking,conversion_rate_ranking"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get Ad insights with performance metrics"
+          }
+        },
+        {
+          "name": "Update Campaign Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "status",
+                  "value": "PAUSED",
+                  "description": "Status: ACTIVE, PAUSED, DELETED"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{facebookApiUrl}}/{{campaignId}}",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["{{campaignId}}"]
+            },
+            "description": "Update campaign status (ACTIVE, PAUSED, DELETED)"
+          }
+        },
+        {
+          "name": "Update AdSet Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "status",
+                  "value": "PAUSED",
+                  "description": "Status: ACTIVE, PAUSED, DELETED"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{facebookApiUrl}}/{{adsetId}}",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["{{adsetId}}"]
+            },
+            "description": "Update AdSet status (ACTIVE, PAUSED, DELETED)"
+          }
+        },
+        {
+          "name": "Update Ad Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "status",
+                  "value": "PAUSED",
+                  "description": "Status: ACTIVE, PAUSED, DELETED"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{facebookApiUrl}}/{{adId}}",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["{{adId}}"]
+            },
+            "description": "Update Ad status (ACTIVE, PAUSED, DELETED)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔍 Advanced Analytics",
+      "description": "Advanced analytics and reporting endpoints",
+      "item": [
+        {
+          "name": "Get Custom Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=campaign&time_range={'since':'2024-01-01','until':'2024-01-31'}&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions&breakdowns=age,gender&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "campaign"
+                },
+                {
+                  "key": "time_range",
+                  "value": "{'since':'2024-01-01','until':'2024-01-31'}",
+                  "description": "Custom date range"
+                },
+                {
+                  "key": "fields",
+                  "value": "campaign_id,campaign_name,impressions,clicks,spend,reach,frequency,ctr,cpc,cpm,purchase_roas,actions,conversions"
+                },
+                {
+                  "key": "breakdowns",
+                  "value": "age,gender",
+                  "description": "Optional breakdowns: age, gender, country, placement, device_platform"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get custom insights with specific date range and breakdowns"
+          }
+        },
+        {
+          "name": "Get Video Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=ad&date_preset=last_7d&fields=ad_id,ad_name,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "ad"
+                },
+                {
+                  "key": "date_preset",
+                  "value": "last_7d"
+                },
+                {
+                  "key": "fields",
+                  "value": "ad_id,ad_name,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_avg_time_watched_actions"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get video-specific insights and engagement metrics"
+          }
+        },
+        {
+          "name": "Get Audience Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/act_{{adAccountId}}/insights?access_token={{facebookAccessToken}}&level=campaign&date_preset=last_30d&fields=campaign_id,campaign_name,impressions,clicks,spend,reach,frequency&breakdowns=age,gender,country,placement&limit=100",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["act_{{adAccountId}}", "insights"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "level",
+                  "value": "campaign"
+                },
+                {
+                  "key": "date_preset",
+                  "value": "last_30d"
+                },
+                {
+                  "key": "fields",
+                  "value": "campaign_id,campaign_name,impressions,clicks,spend,reach,frequency"
+                },
+                {
+                  "key": "breakdowns",
+                  "value": "age,gender,country,placement"
+                },
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Get audience insights with demographic breakdowns"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Testing & Validation",
+      "description": "Testing and validation endpoints",
+      "item": [
+        {
+          "name": "Test Facebook Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"access_token\": \"{{facebookAccessToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/facebook-ads/api/test-token/",
+              "host": ["{{baseUrl}}"],
+              "path": ["facebook-ads", "api", "test-token", ""]
+            },
+            "description": "Test Facebook access token validity"
+          }
+        },
+        {
+          "name": "Debug Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/debug_token?input_token={{facebookAccessToken}}&access_token={{facebookAccessToken}}",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["debug_token"],
+              "query": [
+                {
+                  "key": "input_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                }
+              ]
+            },
+            "description": "Debug Facebook access token information"
+          }
+        },
+        {
+          "name": "Get User Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{facebookApiUrl}}/me?access_token={{facebookAccessToken}}&fields=id,name,email",
+              "host": ["{{facebookApiUrl}}"],
+              "path": ["me"],
+              "query": [
+                {
+                  "key": "access_token",
+                  "value": "{{facebookAccessToken}}"
+                },
+                {
+                  "key": "fields",
+                  "value": "id,name,email"
+                }
+              ]
+            },
+            "description": "Get authenticated user information"
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Pre-request script for authentication",
+          "// This can be used to automatically get tokens or set up authentication"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Test script for response validation",
+          "pm.test('Status code is 200', function () {",
+          "    pm.response.to.have.status(200);",
+          "});",
+          "",
+          "pm.test('Response time is less than 2000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+          "});"
+        ]
+      }
+    }
+  ]
+} 
